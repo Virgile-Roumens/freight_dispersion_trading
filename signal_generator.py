@@ -1,15 +1,15 @@
 """
-SignalGenerator Class - Feature Engineering et Signaux de Trading
+SignalGenerator Class - Feature Engineering and Trading Signals
 
-Responsabilités:
-- Normaliser les données (z-scores)
-- Classifier en régimes (quartiles)
-- Générer 2 signaux simples et économiquement justifiés
-- Fournir explications pour chaque signal
+Responsibilities:
+- Normalize data (z-scores)
+- Classify into regimes (quartiles)
+- Generate 2 simple and economically justified signals
+- Provide explanations for each signal
 
-Context Économique:
-Signal 1 (Momentum): Changements à court terme de dispersion
-Signal 2 (Regime): État structurel du marché (quartiles)
+Economic Context:
+Signal 1 (Momentum): Short-term dispersion changes
+Signal 2 (Regime): Structural market state (quartiles)
 """
 
 import pandas as pd
@@ -19,65 +19,65 @@ from typing import Dict, List
 
 class SignalGenerator:
     """
-    Génère les signaux de trading à partir des données propres.
+    Generates trading signals from clean data.
     
     Attributes:
-        data (pd.DataFrame): Données propres de DataManager
-        features (pd.DataFrame): Features calculées + signaux
-        signal_explanations (dict): Explications économiques des signaux
+        data (pd.DataFrame): Clean data from DataManager
+        features (pd.DataFrame): Calculated features + signals
+        signal_explanations (dict): Economic explanations of signals
     """
     
     def __init__(self, clean_data: pd.DataFrame, verbose: bool = True):
         """
-        Initialiser SignalGenerator.
+        Initialize SignalGenerator.
         
         Args:
-            clean_data: Sortie de DataManager.get_clean_data()
-            verbose: Afficher les logs
+            clean_data: Output from DataManager.get_clean_data()
+            verbose: Display logs
         """
         self.data = clean_data.copy()
         self.features = None
         self.verbose = verbose
         
-        # Explications des signaux
+        # Signal explanations
         self.signal_explanations = {
             'momentum': {
-                'description': '📈 Signal de Momentum Dispersion',
-                'logic': 'LONG si changement 5j > 0; SHORT si < 0; FLAT sinon',
+                'description': '📈 Dispersion Momentum Signal',
+                'logic': 'LONG if 5-day change > 0; SHORT if < 0; FLAT otherwise',
                 'economic_meaning': (
-                    'La dispersion qui augmente suggère une meilleure répartition '
-                    'des bateaux = demande en hausse = potentiellement prix plus hauts. '
-                    'L\'inverse indique une consolidation = demande affaiblie.'
+                    'Increasing dispersion suggests better vessel distribution '
+                    '= rising demand = potentially higher prices. '
+                    'The opposite indicates consolidation = weakening demand.'
                 ),
-                'signal_type': 'Technique/Comportemental',
-                'horizon': '5-20 jours',
-                'rationale': 'Les changements de dispersion précèdent les mouvements de prix'
+                'signal_type': 'Technical/Behavioral',
+                'horizon': '5-20 days',
+                'rationale': 'Dispersion changes precede price movements'
             },
             'regime': {
-                'description': '🎯 Signal de Regime (Quartiles)',
-                'logic': 'LONG en Q3-Q4 (haute); SHORT en Q1 (basse); FLAT en Q2',
+                'description': '🎯 Regime Signal (Quartiles)',
+                'logic': 'LONG in Q3-Q4 (high); SHORT in Q1 (low); FLAT in Q2',
                 'economic_meaning': (
-                    'Les périodes de haute dispersion (Q3-Q4) reflètent un marché '
-                    'structurellement sain avec ~41% de prime vs Q1. '
-                    'Cela capture l\'état structurel, pas un timing fin.'
+                    'High dispersion periods (Q3-Q4) reflect a structurally '
+                    'healthy market with ~41% premium vs Q1. '
+                    'This captures structural state, not fine timing.'
                 ),
-                'signal_type': 'Structurel/Fondamental',
-                'horizon': 'Multi-semaines',
-                'rationale': 'Capture l\'état de l\'équilibre offre/demande global'
+                'signal_type': 'Structural/Fundamental',
+                'horizon': 'Multi-week',
+                'rationale': 'Captures global supply/demand equilibrium state'
             }
         }
         
-        # Calculer
+        # Calculate
         self._compute_features()
         self._generate_signals()
     
     def _compute_features(self) -> None:
-        """Calculer toutes les features (z-scores, quartiles, momentum)."""
+        """Calculate all features (z-scores, quartiles, momentum)."""
         try:
             self.features = self.data.copy()
-            window = 60  # Fenêtre rolling
+            window = 60  # Rolling window
             
-            # Z-scores dispersion moyenne
+            # Average dispersion z-scores
             self.features['avg_disp_mean_60d'] = (
                 self.features['avg_dispersion'].rolling(window).mean()
             )
@@ -104,7 +104,7 @@ class SignalGenerator:
                 self.features['vloc_dispersion'].rolling(window).std()
             )
             
-            # Z-scores prix
+            # Price z-scores
             self.features['price_mean_60d'] = (
                 self.features['price_5tc'].rolling(window).mean()
             )
@@ -117,15 +117,15 @@ class SignalGenerator:
                 self.features['price_std_60d']
             )
             
-            # Quartiles de dispersion (régimes)
+            # Dispersion quartiles (regimes)
             self.features['disp_quartile'] = pd.qcut(
                 self.features['avg_dispersion'],
                 q=4,
-                labels=['Q1_Bas', 'Q2_Moyen_Bas', 'Q3_Moyen_Haut', 'Q4_Haut'],
+                labels=['Q1_Low', 'Q2_Medium_Low', 'Q3_Medium_High', 'Q4_High'],
                 duplicates='drop'
             )
             
-            # Momentum normalisé
+            # Normalized momentum
             disp_change_mean = (
                 self.features['avg_disp_change_5d'].rolling(window).mean()
             )
@@ -138,13 +138,13 @@ class SignalGenerator:
             )
             
             if self.verbose:
-                print("✓ Features calculées (z-scores, quartiles, momentum)")
+                print("✓ Features calculated (z-scores, quartiles, momentum)")
         except Exception as e:
-            print(f"✗ Erreur computation features: {e}")
+            print(f"✗ Error computing features: {e}")
             raise
     
     def _generate_signals(self) -> None:
-        """Générer les 2 signaux simples."""
+        """Generate the 2 simple signals."""
         try:
             # SIGNAL 1: Momentum
             self.features['signal_momentum'] = np.where(
@@ -158,11 +158,11 @@ class SignalGenerator:
             # SIGNAL 2: Regime
             self.features['signal_regime'] = 0
             self.features.loc[
-                self.features['disp_quartile'].isin(['Q3_Moyen_Haut', 'Q4_Haut']),
+                self.features['disp_quartile'].isin(['Q3_Medium_High', 'Q4_High']),
                 'signal_regime'
             ] = 1
             self.features.loc[
-                self.features['disp_quartile'] == 'Q1_Bas',
+                self.features['disp_quartile'] == 'Q1_Low',
                 'signal_regime'
             ] = -1
             
@@ -171,19 +171,19 @@ class SignalGenerator:
             )
             
             if self.verbose:
-                print("✓ Signaux générés (Momentum + Regime)")
+                print("✓ Signals generated (Momentum + Regime)")
         except Exception as e:
-            print(f"✗ Erreur génération signaux: {e}")
+            print(f"✗ Error generating signals: {e}")
             raise
     
     def get_signals_dataframe(self) -> pd.DataFrame:
-        """Retourner le DataFrame complet avec signaux."""
+        """Return complete DataFrame with signals."""
         if self.features is None:
-            raise ValueError("Features non calculées")
+            raise ValueError("Features not calculated")
         return self.features.copy()
     
     def get_latest_signals(self, n_rows: int = 20) -> pd.DataFrame:
-        """Retourner les derniers n signaux."""
+        """Return the last n signals."""
         if self.features is None:
             return pd.DataFrame()
         
@@ -195,7 +195,7 @@ class SignalGenerator:
         return self.features[display_cols].tail(n_rows).copy()
     
     def get_signal_statistics(self) -> Dict[str, Dict]:
-        """Calculer les stats pour chaque signal."""
+        """Calculate stats for each signal."""
         if self.features is None:
             return {}
         
@@ -242,17 +242,17 @@ class SignalGenerator:
         return stats
     
     def get_signal_explanation(self, signal_type: str) -> Dict:
-        """Retourner l'explication d'un signal."""
+        """Return explanation for a signal."""
         return self.signal_explanations.get(signal_type, {})
     
     def get_all_explanations(self) -> Dict:
-        """Retourner toutes les explications."""
+        """Return all explanations."""
         return self.signal_explanations
     
     def signal_summary(self) -> str:
-        """Retourner un résumé texte du dernier signal."""
+        """Return text summary of latest signal."""
         if self.features is None or len(self.features) == 0:
-            return "Pas de signaux disponibles"
+            return "No signals available"
         
         latest = self.features.iloc[-1]
         
@@ -266,27 +266,27 @@ class SignalGenerator:
         
         summary = f"""
 ╔══════════════════════════════════════════════════════════════╗
-║                    ÉTAT ACTUEL DES SIGNAUX                  ║
+║                    CURRENT SIGNAL STATE                     ║
 ╚══════════════════════════════════════════════════════════════╝
 
 Date: {latest['date'].strftime('%Y-%m-%d')}
 
-MARCHÉ ACTUELLEMENT:
-• Prix 5TC: ${latest['price_5tc']:.0f}/jour
-• Dispersion Moyenne: {latest['avg_dispersion']:.0f}
+MARKET CURRENTLY:
+• 5TC Price: ${latest['price_5tc']:.0f}/day
+• Average Dispersion: {latest['avg_dispersion']:.0f}
   (Capesize: {latest['cape_dispersion']:.0f}, VLOC: {latest['vloc_dispersion']:.0f})
-• Régime: {latest['disp_quartile']}
-• Z-score Dispersion: {latest['avg_disp_zscore']:.2f}
+• Regime: {latest['disp_quartile']}
+• Dispersion Z-score: {latest['avg_disp_zscore']:.2f}
 
-SIGNAUX AUJOURD'HUI:
+SIGNALS TODAY:
 • Momentum: {signal_to_text(latest['signal_momentum'])}
-  (Changement 5j: {latest['avg_disp_change_5d']:+.1f}, force: {latest['momentum_zscore']:.2f}σ)
+  (5-day change: {latest['avg_disp_change_5d']:+.1f}, strength: {latest['momentum_zscore']:.2f}σ)
   
 • Regime: {signal_to_text(latest['signal_regime'])}
-  (Régime: {latest['disp_quartile']})
+  (Regime: {latest['disp_quartile']})
 
-RETOUR ATTENDU (5 jours):
-• Moyenne historique sur signaux similaires: {latest['return_5d']:+.1%}
+EXPECTED RETURN (5 days):
+• Historical average on similar signals: {latest['return_5d']:+.1%}
 """
         return summary
     

@@ -1,12 +1,12 @@
 """
-BacktestEngine Class - Simulation de Portefeuille et Performance
+BacktestEngine Class - Portfolio Simulation and Performance
 
-Responsabilités:
-- Simuler le trading quotidien
-- Rebalancing automatique
-- Calcul P&L avec frais réalistes
-- Métriques de performance (Sharpe, Drawdown, Win Rate)
-- Analyse de sensibilité aux frais
+Responsibilities:
+- Simulate daily trading
+- Automatic rebalancing
+- Calculate P&L with realistic fees
+- Performance metrics (Sharpe, Drawdown, Win Rate)
+- Fee sensitivity analysis
 """
 
 import pandas as pd
@@ -17,15 +17,15 @@ from datetime import datetime
 
 class BacktestEngine:
     """
-    Backteste les stratégies avec assumptions réalistes.
+    Backtests strategies with realistic assumptions.
     
     Attributes:
-        data (pd.DataFrame): DataFrame avec signaux
-        initial_capital (float): Capital initial
-        transaction_fee_bps (float): Frais en basis points
-        results (dict): Résultats du backtest
-        trade_log (list): Historique des trades
-        equity_curve (list): Courbe d'équité
+        data (pd.DataFrame): DataFrame with signals
+        initial_capital (float): Initial capital
+        transaction_fee_bps (float): Fees in basis points
+        results (dict): Backtest results
+        trade_log (list): Trade history
+        equity_curve (list): Equity curve
     """
     
     def __init__(
@@ -37,22 +37,22 @@ class BacktestEngine:
         verbose: bool = True
     ):
         """
-        Initialiser BacktestEngine.
+        Initialize BacktestEngine.
         
         Args:
-            data_with_signals: DataFrame avec signaux de SignalGenerator
-            initial_capital: Capital initial en USD
-            transaction_fee_bps: Frais par trade en basis points
-            max_drawdown_stop: Hard stop si drawdown > ce %, 0 pour désactiver
-            verbose: Afficher les logs
+            data_with_signals: DataFrame with signals from SignalGenerator
+            initial_capital: Initial capital in USD
+            transaction_fee_bps: Fees per trade in basis points
+            max_drawdown_stop: Hard stop if drawdown > this %, 0 to disable
+            verbose: Display logs
         """
         self.data = data_with_signals.copy()
         self.initial_capital = initial_capital
-        self.fee_bps = transaction_fee_bps / 10000  # Convertir en décimal
+        self.fee_bps = transaction_fee_bps / 10000  # Convert to decimal
         self.max_dd_stop = max_drawdown_stop
         self.verbose = verbose
         
-        # Stockage des résultats
+        # Store results
         self.results = {}
         self.trade_log = []
         self.equity_curve = []
@@ -64,16 +64,16 @@ class BacktestEngine:
         strategy_name: str
     ) -> Dict:
         """
-        Lancer un backtest complet.
+        Run a complete backtest.
         
         Args:
-            signal_column: Colonne du signal ('signal_momentum' ou 'signal_regime')
-            strategy_name: Nom de la stratégie pour affichage
+            signal_column: Signal column ('signal_momentum' or 'signal_regime')
+            strategy_name: Strategy name for display
             
         Returns:
-            Dict avec les résultats (Sharpe, Return, Drawdown, etc.)
+            Dict with results (Sharpe, Return, Drawdown, etc.)
         """
-        # Réinitialiser
+        # Reset
         self.trade_log = []
         self.equity_curve = [self.initial_capital]
         self.dates_equity = [self.data.iloc[0]['date']]
@@ -88,22 +88,22 @@ class BacktestEngine:
             print(f"BACKTEST: {strategy_name}")
             print(f"{'='*70}")
             print(f"Capital: ${self.initial_capital:,.0f}")
-            print(f"Frais: {self.fee_bps*10000:.1f} bps")
+            print(f"Fees: {self.fee_bps*10000:.1f} bps")
         
-        # Boucle sur chaque jour
+        # Loop over each day
         for i in range(len(self.data)):
             row = self.data.iloc[i]
             new_signal = row[signal_column]
             current_price = row['price_5tc']
             current_date = row['date']
             
-            # Vérifier si rebalancing nécessaire
+            # Check if rebalancing necessary
             should_rebalance = False
             
             if new_signal != position:
                 should_rebalance = True
             
-            # Hard stop si drawdown dépassé
+            # Hard stop if drawdown exceeded
             if position != 0 and entry_price is not None and self.max_dd_stop > 0:
                 unrealized_pnl = position * (current_price - entry_price)
                 unrealized_pct = unrealized_pnl / (entry_price * abs(position))
@@ -112,7 +112,7 @@ class BacktestEngine:
             
             # REBALANCE
             if should_rebalance:
-                # Fermer position précédente
+                # Close previous position
                 if position != 0 and entry_price is not None:
                     exit_pnl = position * (current_price - entry_price)
                     fee_exit = abs(position) * current_price * self.fee_bps
@@ -133,7 +133,7 @@ class BacktestEngine:
                         'days_held': (current_date - entry_date).days,
                     })
                 
-                # Ouvrir nouvelle position
+                # Open new position
                 if new_signal != 0:
                     entry_price = current_price
                     entry_date = current_date
@@ -145,11 +145,11 @@ class BacktestEngine:
                     entry_price = None
                     entry_date = None
             
-            # Enregistrer equity quotidienne
+            # Record daily equity
             self.equity_curve.append(capital)
             self.dates_equity.append(current_date)
         
-        # Calculer métriques
+        # Calculate metrics
         self.results = self._compute_metrics(strategy_name)
         
         if self.verbose:
@@ -158,15 +158,15 @@ class BacktestEngine:
         return self.results
     
     def _compute_metrics(self, strategy_name: str) -> Dict:
-        """Calculer toutes les métriques de performance."""
+        """Calculate all performance metrics."""
         trades_df = pd.DataFrame(self.trade_log) if self.trade_log else pd.DataFrame()
         equity_arr = np.array(self.equity_curve)
         
-        # Returns basiques
+        # Basic returns
         total_pnl = self.equity_curve[-1] - self.initial_capital
         total_return = total_pnl / self.initial_capital
         
-        # Stats des trades
+        # Trade stats
         if len(trades_df) > 0:
             winning_trades = (trades_df['net_pnl'] > 0).sum()
             losing_trades = (trades_df['net_pnl'] < 0).sum()
@@ -228,32 +228,32 @@ class BacktestEngine:
         }
     
     def _print_results(self, strategy_name: str) -> None:
-        """Afficher les résultats du backtest."""
+        """Display backtest results."""
         if not self.results:
             return
         
         print(f"\n{'─'*70}")
-        print(f"RÉSULTATS: {strategy_name}")
+        print(f"RESULTS: {strategy_name}")
         print(f"{'─'*70}")
-        print(f"Retour Total:      {self.results['total_return_pct']:.1%} "
+        print(f"Total Return:      {self.results['total_return_pct']:.1%} "
               f"({self.results['total_pnl']:,.0f}$)")
         print(f"Sharpe Ratio:      {self.results['sharpe_ratio']:.2f}")
         print(f"Max Drawdown:      {self.results['max_drawdown_pct']:.1%}")
         print(f"Calmar Ratio:      {self.results['calmar_ratio']:.2f}")
         print(f"Win Rate:          {self.results['win_rate']:.1%} "
               f"({self.results['winning_trades']}/{self.results['num_trades']})")
-        print(f"Frais Totaux:      ${self.results['total_fees_paid']:,.0f}")
+        print(f"Total Fees:        ${self.results['total_fees_paid']:,.0f}")
     
     def get_results(self) -> Dict:
-        """Retourner les résultats du backtest."""
+        """Return backtest results."""
         return self.results.copy()
     
     def get_trade_log(self) -> pd.DataFrame:
-        """Retourner le journal des trades."""
+        """Return trade log."""
         return pd.DataFrame(self.trade_log) if self.trade_log else pd.DataFrame()
     
     def get_equity_curve(self) -> Tuple[List, List]:
-        """Retourner la courbe d'équité (values, dates)."""
+        """Return equity curve (values, dates)."""
         return self.equity_curve, self.dates_equity
     
     def compare_fees_sensitivity(
@@ -262,27 +262,27 @@ class BacktestEngine:
         strategy_name: str,
         fee_levels: List[float]
     ) -> pd.DataFrame:
-        """Analyser la sensibilité à différents niveaux de frais."""
+        """Analyze sensitivity to different fee levels."""
         results_list = []
         
         for fee_bps in fee_levels:
-            # Sauvegarder frais actuels
+            # Save current fees
             original_fee = self.fee_bps
             self.fee_bps = fee_bps / 10000
             
-            # Lancer backtest
+            # Run backtest
             results = self.backtest_strategy(signal_column, strategy_name)
             
             results_list.append({
-                'Frais (bps)': int(fee_bps),
-                'Retour': f"{results['total_return_pct']:.1%}",
+                'Fees (bps)': int(fee_bps),
+                'Return': f"{results['total_return_pct']:.1%}",
                 'Sharpe': f"{results['sharpe_ratio']:.2f}",
                 'Max DD': f"{results['max_drawdown_pct']:.1%}",
                 'Win Rate': f"{results['win_rate']:.1%}",
-                'Frais Totaux': f"${results['total_fees_paid']:,.0f}",
+                'Total Fees': f"${results['total_fees_paid']:,.0f}",
             })
             
-            # Restaurer frais
+            # Restore fees
             self.fee_bps = original_fee
         
         return pd.DataFrame(results_list)

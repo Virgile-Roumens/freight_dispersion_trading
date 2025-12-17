@@ -1,65 +1,65 @@
 """
-ARCHITECTURE RAPIDE - Référence pour Developers
-================================================
+QUICK ARCHITECTURE REFERENCE - For Developers
+==============================================
 
-Structure du Projet:
+Project Structure:
 """
 
 # ============================================================================
-# STRUCTURE DES FICHIERS
+# FILE STRUCTURE
 # ============================================================================
 
 """
-├── cape_front_month.csv                [Données d'entrée]
-├── dispersion_case_study.csv           [Données d'entrée]
-├── requirements.txt                    [Dépendances Python]
+├── cape_front_month.csv                [Input data]
+├── dispersion_case_study.csv           [Input data]
+├── requirements.txt                    [Python dependencies]
 │
-├── data_manager.py                     [Classe #1: Chargement données]
+├── data_manager.py                     [Class #1: Data loading]
 │   ├── class DataManager
 │   │   ├── __init__(price_csv, dispersion_csv)
-│   │   ├── get_clean_data()            → DataFrame propre
-│   │   ├── get_data_summary()          → Dict avec stats
-│   │   └── validate_data()             → Rapport qualité
+│   │   ├── get_clean_data()            → Clean DataFrame
+│   │   ├── get_data_summary()          → Dict with stats
+│   │   └── validate_data()             → Quality report
 │
-├── signal_generator.py                 [Classe #2: Signaux]
+├── signal_generator.py                 [Class #2: Signals]
 │   ├── class SignalGenerator
 │   │   ├── __init__(clean_data)
-│   │   ├── get_signals_dataframe()     → DataFrame avec signaux
-│   │   ├── get_signal_statistics()     → Stats par signal
-│   │   ├── get_all_explanations()      → Explications économiques
-│   │   └── signal_summary()            → Résumé texte
+│   │   ├── get_signals_dataframe()     → DataFrame with signals
+│   │   ├── get_signal_statistics()     → Stats per signal
+│   │   ├── get_all_explanations()      → Economic explanations
+│   │   └── signal_summary()            → Text summary
 │
-├── backtest_engine.py                  [Classe #3: Backtest]
+├── backtest_engine.py                  [Class #3: Backtest]
 │   ├── class BacktestEngine
 │   │   ├── __init__(data_with_signals, params)
-│   │   ├── backtest_strategy()         → Dict résultats
-│   │   ├── get_results()               → Métriques finales
+│   │   ├── backtest_strategy()         → Dict results
+│   │   ├── get_results()               → Final metrics
 │   │   ├── get_trade_log()             → DataFrame trades
-│   │   ├── get_equity_curve()          → Courbe équité
-│   │   └── compare_fees_sensitivity()  → Sensibilité frais
+│   │   ├── get_equity_curve()          → Equity curve
+│   │   └── compare_fees_sensitivity()  → Fee sensitivity
 │
-└── streamlit_app.py                    [Interface Utilisateur]
+└── streamlit_app.py                    [User Interface]
     ├── @st.cache_resource load_data_once()
-    ├── Tab 1: 📊 Aperçu Données
-    ├── Tab 2: 🎯 Explorateur Signaux
-    ├── Tab 3: 🏦 Résultats Backtest
-    ├── Tab 4: 📈 Analyse Économique
-    └── Tab 5: ⚔️ Comparaison Stratégies
+    ├── Tab 1: 📊 Data Overview
+    ├── Tab 2: 🎯 Signal Explorer
+    ├── Tab 3: 🏦 Backtest Results
+    ├── Tab 4: 📈 Economic Analysis
+    └── Tab 5: ⚔️ Strategy Comparison
 """
 
 # ============================================================================
-# FLUX DE DONNÉES
+# DATA FLOW
 # ============================================================================
 
 """
-CSV (prix + dispersion)
+CSV (price + dispersion)
     │
     ↓
 DataManager.load()
     │
-    ├─→ price_data (nettoyé)
-    ├─→ dispersion_data (Capesize + VLOC séparés)
-    └─→ merged_data (fusionné, features basiques)
+    ├─→ price_data (cleaned)
+    ├─→ dispersion_data (Capesize + VLOC separated)
+    └─→ merged_data (merged, basic features)
     │
     ↓
 clean_data = DataManager.get_clean_data()
@@ -67,9 +67,9 @@ clean_data = DataManager.get_clean_data()
     ↓
 SignalGenerator(clean_data)
     │
-    ├─→ Calcule z-scores, quartiles, momentum
-    ├─→ Crée signal_momentum (+ ou -)
-    └─→ Crée signal_regime (+ ou -)
+    ├─→ Calculates z-scores, quartiles, momentum
+    ├─→ Creates signal_momentum (+ or -)
+    └─→ Creates signal_regime (+ or -)
     │
     ↓
 signals_df = SignalGenerator.get_signals_dataframe()
@@ -77,9 +77,9 @@ signals_df = SignalGenerator.get_signals_dataframe()
     ↓
 BacktestEngine(signals_df)
     │
-    ├─→ Simule trades quotidiens
-    ├─→ Calcule P&L avec frais
-    └─→ Génère equity curve
+    ├─→ Simulates daily trades
+    ├─→ Calculates P&L with fees
+    └─→ Generates equity curve
     │
     ↓
 results = BacktestEngine.backtest_strategy()
@@ -89,38 +89,38 @@ results = BacktestEngine.backtest_strategy()
     └─→ Equity curve
     │
     ↓
-Streamlit Dashboard affiche tout
+Streamlit Dashboard displays everything
 """
 
 # ============================================================================
-# CLASSES - VUE D'ENSEMBLE
+# CLASSES - OVERVIEW
 # ============================================================================
 
 class DataManager:
     """
-    Responsabilités:
-    - Charger prix 5TC front-month
-    - Charger dispersion (Capesize + VLOC)
-    - Fusionner les données
-    - Valider la qualité
-    - Fournir DataFrame propre
+    Responsibilities:
+    - Load 5TC front-month prices
+    - Load dispersion (Capesize + VLOC)
+    - Merge datasets
+    - Validate quality
+    - Provide clean DataFrame
     
     Inputs:
     - cape_front_month.csv (date, value)
     - dispersion_case_study.csv (date, VesselClass, VesselCount, Dispersion)
     
     Outputs:
-    - DataFrame merged avec colonnes:
+    - Merged DataFrame with columns:
       - date, price_5tc
       - cape_dispersion, cape_vessel_count
       - vloc_dispersion, vloc_vessel_count
-      - avg_dispersion (pondérée)
+      - avg_dispersion (weighted)
       - log_return_1d, return_5d
       - *_disp_change_1d, *_disp_change_5d
     
-    Méthodes clés:
-    - get_clean_data() → DataFrame propre (NaN supprimés)
-    - get_data_summary() → Dict{sample_size, corrélations, stats}
+    Key Methods:
+    - get_clean_data() → Clean DataFrame (NaN removed)
+    - get_data_summary() → Dict{sample_size, correlations, stats}
     - validate_data() → Dict{checks: outliers, gaps, variance}
     """
     pass
@@ -128,46 +128,46 @@ class DataManager:
 
 class SignalGenerator:
     """
-    Responsabilités:
-    - Normaliser données (z-scores)
-    - Créer quartiles (régimes)
-    - Générer 2 signaux simples
-    - Expliquer économiquement
+    Responsibilities:
+    - Normalize data (z-scores)
+    - Create quartiles (regimes)
+    - Generate 2 simple signals
+    - Provide economic explanations
     
     Inputs:
-    - DataFrame propre de DataManager
+    - Clean DataFrame from DataManager
     
     Outputs:
-    - DataFrame features avec colonnes:
-      - *_zscore (normalisations)
+    - Features DataFrame with columns:
+      - *_zscore (normalizations)
       - *_quartile (classifications)
       - signal_momentum (+1, -1, 0)
       - signal_regime (+1, -1, 0)
-      - *_strength (Z-scores absolus)
+      - *_strength (absolute Z-scores)
     
-    Méthodes clés:
-    - get_signals_dataframe() → DataFrame avec signaux
-    - get_signal_statistics() → Dict stats par signal
-    - get_all_explanations() → Dict explications économiques
-    - signal_summary() → String résumé texte
+    Key Methods:
+    - get_signals_dataframe() → DataFrame with signals
+    - get_signal_statistics() → Dict stats per signal
+    - get_all_explanations() → Dict economic explanations
+    - signal_summary() → String text summary
     """
     pass
 
 
 class BacktestEngine:
     """
-    Responsabilités:
-    - Simuler trading quotidien
-    - Rebalancing automatique
-    - Calculer P&L avec frais
-    - Générer métriques (Sharpe, Drawdown, etc.)
-    - Analyser sensibilité frais
+    Responsibilities:
+    - Simulate daily trading
+    - Automatic rebalancing
+    - Calculate P&L with fees
+    - Generate metrics (Sharpe, Drawdown, etc.)
+    - Analyze fee sensitivity
     
     Inputs:
-    - DataFrame avec signaux de SignalGenerator
-    - initial_capital (défaut: 1M)
-    - transaction_fee_bps (défaut: 10)
-    - max_drawdown_stop (défaut: 0.02)
+    - DataFrame with signals from SignalGenerator
+    - initial_capital (default: 1M)
+    - transaction_fee_bps (default: 10)
+    - max_drawdown_stop (default: 0.02)
     
     Outputs:
     - results: Dict{
@@ -178,79 +178,79 @@ class BacktestEngine:
                        direction, net_pnl, return_pct, ...}]
     - equity_curve: List[portfolio values]
     
-    Méthodes clés:
-    - backtest_strategy(signal_col) → Dict résultats
-    - get_results() → Dict métriques
+    Key Methods:
+    - backtest_strategy(signal_col) → Dict results
+    - get_results() → Dict metrics
     - get_trade_log() → DataFrame trades
     - get_equity_curve() → (values, dates)
-    - compare_fees_sensitivity(fee_levels) → DataFrame sensibilité
+    - compare_fees_sensitivity(fee_levels) → DataFrame sensitivity
     """
     pass
 
 
 # ============================================================================
-# SIGNAUX - DÉTAIL TECHNIQUE
+# SIGNALS - TECHNICAL DETAIL
 # ============================================================================
 
 """
 SIGNAL 1: MOMENTUM DISPERSION
 =============================
 
-Calcul:
+Calculation:
   avg_disp_change_5d = avg_dispersion[t] - avg_dispersion[t-5]
   
   signal_momentum = sign(avg_disp_change_5d)
-                  = +1 si > 0 (LONG)
-                  = -1 si < 0 (SHORT)
-                  =  0 sinon (FLAT)
+                  = +1 if > 0 (LONG)
+                  = -1 if < 0 (SHORT)
+                  =  0 otherwise (FLAT)
 
 Strength:
   momentum_zscore = (avg_disp_change_5d - mean_60d) / std_60d
   strength = |momentum_zscore|
 
-Logique économique:
-  ↑ Dispersion = bateaux se dispersent (réagissent à demande)
-  ↓ Dispersion = bateaux se concentrent (demande faible)
+Economic logic:
+  ↑ Dispersion = vessels dispersing (reacting to demand)
+  ↓ Dispersion = vessels concentrating (weak demand)
 
-Horizon: 5-20 jours (court terme)
+Horizon: 5-20 days (short term)
 
 
 SIGNAL 2: REGIME (QUARTILES)
 ============================
 
-Calcul:
+Calculation:
   quartile = pd.qcut(avg_dispersion, q=4)
-           = [Q1_Bas, Q2_Moyen_Bas, Q3_Moyen_Haut, Q4_Haut]
+           = [Q1_Low, Q2_MedLow, Q3_MedHigh, Q4_High]
   
-  signal_regime = +1 si quartile in [Q3_Moyen_Haut, Q4_Haut]
-                = -1 si quartile == Q1_Bas
-                =  0 sinon
+  signal_regime = +1 if quartile in [Q3_MedHigh, Q4_High]
+                = -1 if quartile == Q1_Low
+                =  0 otherwise
 
 Strength:
   avg_disp_zscore = (avg_dispersion - mean_60d) / std_60d
   strength = |avg_disp_zscore|
 
-Logique économique:
-  Q4 (haute dispersion) = marché équilibré = prix élevés
-  Q1 (basse dispersion) = congestion = prix bas
-  Capture l'état structurel
+Economic logic:
+  Q4 (high dispersion) = balanced market = high prices
+  Q1 (low dispersion) = congestion = low prices
+  Captures structural state
 
-Horizon: Multi-semaines (long terme relatif)
+Horizon: Multi-week (relative long term)
 """
 
 # ============================================================================
-# MÉTRIQUES BACKTEST - DÉFINITIONS
+# BACKTEST METRICS - DEFINITIONS
 # ============================================================================
 
 """
-RETOUR TOTAL
+TOTAL RETURN
 ============
 total_return = (final_equity - initial_capital) / initial_capital
 
-Exemples:
-  - 18% = bon
-  - 5% = faible
-  - -5% = perte
+Examples:
+  - 18% = good
+  - 5% = weak
+  - -5% = loss
 
 
 SHARPE RATIO
@@ -259,12 +259,12 @@ sharpe = (mean_excess_return / std_excess_return) * sqrt(252)
 
 where:
   excess_return = daily_return - risk_free_rate
-  risk_free_rate ≈ 2% annualisé = 0.02 / 252 par jour
+  risk_free_rate ≈ 2% annualized = 0.02 / 252 per day
 
-Interprétation:
-  - < 0.5: Faible
+Interpretation:
+  - < 0.5: Weak
   - 0.5-0.75: Acceptable
-  - 0.75-1.0: Bon ← VOUS ÊTES ICI
+  - 0.75-1.0: Good ← YOU ARE HERE
   - > 1.0: Excellent (rare)
 
 
@@ -273,65 +273,65 @@ MAX DRAWDOWN
 drawdown_t = (portfolio_t - max_portfolio_0_to_t) / max_portfolio_0_to_t
 max_drawdown = min(drawdown_t)
 
-Exemples:
+Examples:
   - -5% = excellent
   - -12% = acceptable
-  - -25% = risqué
+  - -25% = risky
 
 
 WIN RATE
 ========
 win_rate = num_winning_trades / total_trades
 
-Exemples:
-  - 50% = normal (si gains > pertes)
-  - 55% = bon
+Examples:
+  - 50% = normal (if gains > losses)
+  - 55% = good
   - 60% = excellent
 
-Note: Win rate ne suffit pas. Exemple:
-  - 60% gagnants mais -1% moy
-  - 40% perdants mais -10% moy
-  → Win rate 60% mais PnL négatif (mauvais sizing)
+Note: Win rate is not enough. Example:
+  - 60% winners but -1% avg
+  - 40% losers but -10% avg
+  → Win rate 60% but negative PnL (bad sizing)
 
 
 CALMAR RATIO
 ============
 calmar = annual_return / abs(max_drawdown)
 
-Interprétation:
-  - > 2.0: Excellent (bonne retour, peu de risque)
-  - > 1.0: Bon
-  - < 0.5: Faible
+Interpretation:
+  - > 2.0: Excellent (good return, low risk)
+  - > 1.0: Good
+  - < 0.5: Weak
 
 
 PROFIT FACTOR
 ==============
 profit_factor = total_winning_pnl / abs(total_losing_pnl)
 
-Exemples:
-  - 2.0 = 2x plus de gains que de pertes → bon
-  - 1.5 = bon
+Examples:
+  - 2.0 = 2x more gains than losses → good
+  - 1.5 = good
   - 1.0 = break-even
-  - < 1.0 = négatif
+  - < 1.0 = negative
 """
 
 # ============================================================================
-# UTILISATION COURANTE
+# COMMON USAGE
 # ============================================================================
 
 """
-CHARGER, GÉNÉRER SIGNAUX, BACKTESTER:
+LOAD, GENERATE SIGNALS, BACKTEST:
 ======================================
 
     from data_manager import DataManager
     from signal_generator import SignalGenerator
     from backtest_engine import BacktestEngine
     
-    # 1. Charger
+    # 1. Load
     dm = DataManager('cape_front_month.csv', 'dispersion_case_study.csv')
     data = dm.get_clean_data()
     
-    # 2. Signaux
+    # 2. Signals
     sg = SignalGenerator(data)
     signals = sg.get_signals_dataframe()
     
@@ -340,136 +340,136 @@ CHARGER, GÉNÉRER SIGNAUX, BACKTESTER:
     results_momentum = engine.backtest_strategy('signal_momentum', 'Momentum')
     results_regime = engine.backtest_strategy('signal_regime', 'Regime')
     
-    # 4. Afficher
+    # 4. Display
     print(f"Momentum: Sharpe={results_momentum['sharpe_ratio']:.2f}")
     print(f"Regime: Sharpe={results_regime['sharpe_ratio']:.2f}")
 
 
-EXPLORER INTERACTIVEMENT (STREAMLIT):
+INTERACTIVE EXPLORATION (STREAMLIT):
 ====================================
 
     streamlit run streamlit_app.py
     
-    # Puis:
-    # 1. Tab "Data Overview" → Vérifier corrélations
-    # 2. Tab "Signal Explorer" → Comprendre les signaux
-    # 3. Tab "Backtest Results" → Voir performance
-    # 4. Tab "Economic Analysis" → Analyser pourquoi
-    # 5. Tab "Strategy Comparison" → Comparer les deux
+    # Then:
+    # 1. Tab "Data Overview" → Check correlations
+    # 2. Tab "Signal Explorer" → Understand signals
+    # 3. Tab "Backtest Results" → See performance
+    # 4. Tab "Economic Analysis" → Analyze why
+    # 5. Tab "Strategy Comparison" → Compare both
 """
 
 # ============================================================================
-# CUSTOMISATION
+# CUSTOMIZATION
 # ============================================================================
 
 """
-MODIFIER LES PARAMÈTRES DES SIGNAUX
+MODIFY SIGNAL PARAMETERS
 ===================================
 
-Dans SignalGenerator._compute_features():
+In SignalGenerator._compute_features():
   
-  window = 60  # Fenêtre rolling pour z-scores
-             # Essayer: 30 (rapide), 90 (stable), 120 (très stable)
+  window = 60  # Rolling window for z-scores
+             # Try: 30 (fast), 90 (stable), 120 (very stable)
   
   Q1/Q2/Q3/Q4 = pd.qcut(avg_dispersion, q=4)
-              # Essayer: q=3 (3 régimes), q=5 (5 régimes)
+              # Try: q=3 (3 regimes), q=5 (5 regimes)
   
   signal_momentum = sign(change_5d)
-                  # Essayer: change_1d, change_10d
+                  # Try: change_1d, change_10d
   
   regime = Q3+Q4 LONG, Q1 SHORT
-        # Essayer: Q4 LONG only, Q1-Q2 SHORT
+        # Try: Q4 LONG only, Q1-Q2 SHORT
 
 
-MODIFIER LES PARAMÈTRES DU BACKTEST
+MODIFY BACKTEST PARAMETERS
 ===================================
 
-Dans BacktestEngine.__init__():
+In BacktestEngine.__init__():
   
   initial_capital = 1_000_000
-                  # Essayer: 100k (petit), 5M (large)
+                  # Try: 100k (small), 5M (large)
   
   transaction_fee_bps = 10
-                      # Essayer: 0 (aucun), 5 (optimiste), 20 (pessimiste)
+                      # Try: 0 (none), 5 (optimistic), 20 (pessimistic)
   
   max_drawdown_stop = 0.02
-                    # Essayer: 0.01 (strict), 0.03 (loose), 0 (désactiver)
+                    # Try: 0.01 (strict), 0.03 (loose), 0 (disable)
 
 
-IMPORTANT: Toujours tester forward après customisation!
+IMPORTANT: Always forward-test after customization!
 """
 
 # ============================================================================
-# LIMITATIONS CONNUES
+# KNOWN LIMITATIONS
 # ============================================================================
 
 """
-1. CORRÉLATION FAIBLE (r=0.27)
-   - Explique seulement 7% de la variance
-   - D'autres facteurs dominent 93%
+1. WEAK CORRELATION (r=0.27)
+   - Explains only 7% of variance
+   - Other factors dominate 93%
 
 2. IN-SAMPLE BIAS
-   - Données utilisées pour construire = données utilisées pour tester
-   - Forward-test obligatoire
+   - Data used to build = data used to test
+   - Forward-test mandatory
 
-3. RÉGIMES CHANGEANTS
-   - La corrélation peut se briser à tout moment
-   - Monitoring rolling recommandé
+3. CHANGING REGIMES
+   - Correlation can break at any time
+   - Rolling monitoring recommended
 
-4. FRAIS RÉELS
-   - L'edge diminue rapidement avec les frais
-   - 10 bps est conservateur; vrais coûts peuvent être plus hauts
+4. REAL FEES
+   - Edge decreases rapidly with fees
+   - 10 bps is conservative; real costs may be higher
 
-5. FACTEURS OMIS
-   - Prix fer, taux USD, géopolitique, sentiment
-   - Affectent les prix plus que la dispersion
+5. OMITTED FACTORS
+   - Iron ore price, USD rates, geopolitics, sentiment
+   - Affect prices more than dispersion
 
-6. DONNÉES DE QUALITÉ
-   - Si CSV mal formatées → résultats invalides
-   - Vérifier avec validate_data()
+6. DATA QUALITY
+   - If CSV poorly formatted → invalid results
+   - Check with validate_data()
 """
 
 # ============================================================================
-# STRUCTURE DES DONNÉES (DÉTAIL)
+# DATA STRUCTURE (DETAIL)
 # ============================================================================
 
 """
-APRÈS DataManager.get_clean_data():
+AFTER DataManager.get_clean_data():
 ===================================
 
-Colonne              | Type     | Source            | Sens
+Column               | Type     | Source            | Meaning
 ─────────────────────┼──────────┼───────────────────┼──────────────────
-date                 | datetime | Input             | Date du jour
-price_5tc            | float    | cape_front_month  | Prix 5TC $/jour
+date                 | datetime | Input             | Date of day
+price_5tc            | float    | cape_front_month  | 5TC Price $/day
 cape_vessel_count    | int      | dispersion_csv    | # Capesize
-cape_dispersion      | float    | dispersion_csv    | Dispersion Cape
+cape_dispersion      | float    | dispersion_csv    | Cape Dispersion
 vloc_vessel_count    | int      | dispersion_csv    | # VLOC
-vloc_dispersion      | float    | dispersion_csv    | Dispersion VLOC
-total_vessel_count   | int      | Calculé           | Cape + VLOC
-avg_dispersion       | float    | Calculé           | Pondérée par count
-log_return_1d        | float    | Calculé           | Log-return prix 1j
-return_5d            | float    | Calculé           | Return prix 5j
-cape_disp_change_1d  | float    | Calculé           | Δ Cape disp 1j
-cape_disp_change_5d  | float    | Calculé           | Δ Cape disp 5j
-vloc_disp_change_1d  | float    | Calculé           | Δ VLOC disp 1j
-vloc_disp_change_5d  | float    | Calculé           | Δ VLOC disp 5j
-avg_disp_change_1d   | float    | Calculé           | Δ Avg disp 1j
-avg_disp_change_5d   | float    | Calculé           | Δ Avg disp 5j
+vloc_dispersion      | float    | dispersion_csv    | VLOC Dispersion
+total_vessel_count   | int      | Calculated        | Cape + VLOC
+avg_dispersion       | float    | Calculated        | Weighted by count
+log_return_1d        | float    | Calculated        | Log-return price 1d
+return_5d            | float    | Calculated        | Return price 5d
+cape_disp_change_1d  | float    | Calculated        | Δ Cape disp 1d
+cape_disp_change_5d  | float    | Calculated        | Δ Cape disp 5d
+vloc_disp_change_1d  | float    | Calculated        | Δ VLOC disp 1d
+vloc_disp_change_5d  | float    | Calculated        | Δ VLOC disp 5d
+avg_disp_change_1d   | float    | Calculated        | Δ Avg disp 1d
+avg_disp_change_5d   | float    | Calculated        | Δ Avg disp 5d
 
 
-APRÈS SignalGenerator.get_signals_dataframe():
+AFTER SignalGenerator.get_signals_dataframe():
 ==============================================
 
-+ Des colonnes ci-dessus, ajoute:
++ From columns above, adds:
 
-Colonne              | Type     | Sens
+Column               | Type     | Meaning
 ─────────────────────┼──────────┼────────────────────────────
-avg_disp_zscore      | float    | Normalisation avg_disp
-cape_disp_zscore     | float    | Normalisation cape_disp
-vloc_disp_zscore     | float    | Normalisation vloc_disp
-price_zscore         | float    | Normalisation prix
-momentum_zscore      | float    | Normalisation momentum
-disp_quartile        | str      | Q1/Q2/Q3/Q4 (régime)
+avg_disp_zscore      | float    | Normalization avg_disp
+cape_disp_zscore     | float    | Normalization cape_disp
+vloc_disp_zscore     | float    | Normalization vloc_disp
+price_zscore         | float    | Normalization price
+momentum_zscore      | float    | Normalization momentum
+disp_quartile        | str      | Q1/Q2/Q3/Q4 (regime)
 signal_momentum      | int      | +1/-1/0
 signal_momentum_strength | float | |momentum_zscore|
 signal_regime        | int      | +1/-1/0
@@ -477,51 +477,51 @@ signal_regime_strength | float | |avg_disp_zscore|
 """
 
 # ============================================================================
-# POUR DÉBOGUER
+# FOR DEBUGGING
 # ============================================================================
 
 """
-SI QUELQUE CHOSE NE VA PAS:
+IF SOMETHING GOES WRONG:
 ==========================
 
-1. Vérifier les données d'entrée:
+1. Check input data:
    >>> dm = DataManager(...)
    >>> summary = dm.get_data_summary()
    >>> print(summary)
-   # Vérifier: sample_size, date range, corrélations
+   # Check: sample_size, date range, correlations
    
    >>> validation = dm.validate_data()
    >>> print(validation)
-   # Vérifier: tous les checks au vert?
+   # Check: all checks green?
 
-2. Vérifier que les signaux sont générés:
+2. Check signals are generated:
    >>> sg = SignalGenerator(clean_data)
    >>> signals = sg.get_signals_dataframe()
    >>> print(signals[['date', 'signal_momentum', 'signal_regime']].head(20))
-   # Vérifier: +1/-1/0 alterné? Pas toutes 0?
+   # Check: +1/-1/0 alternating? Not all 0?
    
    >>> stats = sg.get_signal_statistics()
    >>> print(stats)
-   # Vérifier: long_signals, short_signals, flat_signals > 0?
+   # Check: long_signals, short_signals, flat_signals > 0?
 
-3. Vérifier le backtest:
+3. Check backtest:
    >>> engine = BacktestEngine(signals)
    >>> results = engine.backtest_strategy('signal_momentum', 'Test')
    >>> print(results)
-   # Vérifier: sharpe_ratio > 0? num_trades > 0? fees paid > 0?
+   # Check: sharpe_ratio > 0? num_trades > 0? fees paid > 0?
    
    >>> trades = engine.get_trade_log()
    >>> print(trades.head(20))
-   # Vérifier: entry/exit dates, net_pnl réalistes?
+   # Check: entry/exit dates, net_pnl realistic?
    
    >>> equity_vals, equity_dates = engine.get_equity_curve()
    >>> print(f"Start: {equity_vals[0]}, End: {equity_vals[-1]}")
-   # Vérifier: courbe monotone croissante/décroissante?
+   # Check: curve monotone increasing/decreasing?
 
-4. Vérifier le Streamlit:
+4. Check Streamlit:
    >>> streamlit run streamlit_app.py --logger.level=debug
-   # Attendre 30s au premier lancement (cache)
-   # Vérifier les erreurs dans la console
+   # Wait 30s on first launch (cache)
+   # Check errors in console
 """
 
 print(__doc__)

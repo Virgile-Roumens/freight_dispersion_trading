@@ -1,16 +1,16 @@
 """
-DataManager Class - Chargement et Validation des Données
+DataManager Class - Data Loading and Validation
 
-Responsabilités:
-- Charger les prix 5TC front-month (cape_front_month.csv)
-- Charger la dispersion flotte Capesize + VLOC (dispersion_case_study.csv)
-- Fusionner les datasets
-- Valider la qualité des données
-- Fournir un DataFrame propre
+Responsibilities:
+- Load 5TC front-month prices (cape_front_month.csv)
+- Load Capesize + VLOC fleet dispersion (dispersion_case_study.csv)
+- Merge datasets
+- Validate data quality
+- Provide clean DataFrame
 
-Context Économique:
-La dispersion élevée = bateaux bien répartis = meilleur matching offre/demande
-La dispersion basse = bateaux concentrés = congestion potentielle
+Economic Context:
+High dispersion = well-distributed vessels = better supply/demand matching
+Low dispersion = concentrated vessels = potential congestion
 """
 
 import pandas as pd
@@ -22,23 +22,23 @@ from datetime import datetime
 
 class DataManager:
     """
-    Gère le chargement et la validation des données de trading.
+    Manages loading and validation of trading data.
     
     Attributes:
-        price_data (pd.DataFrame): Données brutes 5TC front-month
-        dispersion_data (pd.DataFrame): Données brutes dispersion (Capesize + VLOC)
-        merged_data (pd.DataFrame): Données fusionnées et propres
-        data_quality_report (dict): Rapport de qualité des données
+        price_data (pd.DataFrame): Raw 5TC front-month data
+        dispersion_data (pd.DataFrame): Raw dispersion data (Capesize + VLOC)
+        merged_data (pd.DataFrame): Merged and clean data
+        data_quality_report (dict): Data quality report
     """
     
     def __init__(self, price_csv: str, dispersion_csv: str, verbose: bool = True):
         """
-        Initialiser DataManager et charger les deux datasets.
+        Initialize DataManager and load both datasets.
         
         Args:
-            price_csv: Chemin vers cape_front_month.csv
-            dispersion_csv: Chemin vers dispersion_case_study.csv
-            verbose: Afficher les logs de chargement
+            price_csv: Path to cape_front_month.csv
+            dispersion_csv: Path to dispersion_case_study.csv
+            verbose: Display loading logs
         """
         self.verbose = verbose
         self.price_data = None
@@ -46,31 +46,31 @@ class DataManager:
         self.merged_data = None
         self.data_quality_report = {}
         
-        # Charger les deux datasets
+        # Load both datasets
         self._load_price_data(price_csv)
         self._load_dispersion_data(dispersion_csv)
         
-        # Fusionner et préparer
+        # Merge and prepare
         if self.price_data is not None and self.dispersion_data is not None:
             self._merge_datasets()
             self._add_basic_features()
     
     def _load_price_data(self, filepath: str) -> None:
         """
-        Charger les prix 5TC front-month.
+        Load 5TC front-month prices.
         
-        Colonnes attendues: date, value
-        Extrait: date, value (renommé en price_5tc)
+        Expected columns: date, value
+        Extracts: date, value (renamed to price_5tc)
         """
         try:
             df = pd.read_csv(filepath)
             df['date'] = pd.to_datetime(df['date'])
             
-            # Garder colonnes nécessaires
+            # Keep necessary columns
             self.price_data = df[['date', 'value']].copy()
             self.price_data.rename(columns={'value': 'price_5tc'}, inplace=True)
             
-            # Supprimer doublons
+            # Remove duplicates
             self.price_data = self.price_data.drop_duplicates(
                 subset=['date'], 
                 keep='first'
@@ -78,25 +78,25 @@ class DataManager:
             self.price_data = self.price_data.sort_values('date').reset_index(drop=True)
             
             if self.verbose:
-                print(f"✓ Prix 5TC chargés: {len(self.price_data)} lignes")
-                print(f"  Période: {self.price_data['date'].min().date()} "
-                      f"à {self.price_data['date'].max().date()}")
+                print(f"✓ 5TC prices loaded: {len(self.price_data)} rows")
+                print(f"  Period: {self.price_data['date'].min().date()} "
+                      f"to {self.price_data['date'].max().date()}")
         except Exception as e:
-            print(f"✗ Erreur chargement prix: {e}")
+            print(f"✗ Error loading prices: {e}")
             self.data_quality_report['price_load_error'] = str(e)
     
     def _load_dispersion_data(self, filepath: str) -> None:
         """
-        Charger les données de dispersion flotte (Capesize et VLOC).
+        Load fleet dispersion data (Capesize and VLOC).
         
-        Colonnes attendues: date, VesselClass, VesselCount, Dispersion
-        Sépare Capesize et VLOC, puis calcule moyenne pondérée.
+        Expected columns: date, VesselClass, VesselCount, Dispersion
+        Separates Capesize and VLOC, then calculates weighted average.
         """
         try:
             df = pd.read_csv(filepath)
             df['date'] = pd.to_datetime(df['date'], format='%d/%m/%Y')
             
-            # Séparer Capesize et VLOC
+            # Separate Capesize and VLOC
             df_cape = df[df['VesselClass'] == 'Capesize'][
                 ['date', 'VesselCount', 'Dispersion']
             ].copy()
@@ -104,7 +104,7 @@ class DataManager:
                 ['date', 'VesselCount', 'Dispersion']
             ].copy()
             
-            # Renommer pour clarté
+            # Rename for clarity
             df_cape.rename(columns={
                 'VesselCount': 'cape_vessel_count',
                 'Dispersion': 'cape_dispersion'
@@ -115,10 +115,10 @@ class DataManager:
                 'Dispersion': 'vloc_dispersion'
             }, inplace=True)
             
-            # Fusionner sur date
+            # Merge on date
             self.dispersion_data = df_cape.merge(df_vloc, on='date', how='outer')
             
-            # Nettoyer et trier
+            # Clean and sort
             self.dispersion_data = self.dispersion_data.drop_duplicates(
                 subset=['date'], 
                 keep='first'
@@ -127,13 +127,13 @@ class DataManager:
                 'date'
             ).reset_index(drop=True)
             
-            # Calculer métriques combinées
+            # Calculate combined metrics
             self.dispersion_data['total_vessel_count'] = (
                 self.dispersion_data['cape_vessel_count'].fillna(0) +
                 self.dispersion_data['vloc_vessel_count'].fillna(0)
             )
             
-            # Moyenne pondérée par count
+            # Weighted average by count
             self.dispersion_data['avg_dispersion'] = (
                 (self.dispersion_data['cape_dispersion'] * 
                  self.dispersion_data['cape_vessel_count'].fillna(0) +
@@ -143,26 +143,26 @@ class DataManager:
             )
             
             if self.verbose:
-                print(f"✓ Dispersion flotte chargée: {len(self.dispersion_data)} lignes")
+                print(f"✓ Fleet dispersion loaded: {len(self.dispersion_data)} rows")
                 print(f"  Capesize: {self.dispersion_data['cape_vessel_count'].min():.0f} "
-                      f"à {self.dispersion_data['cape_vessel_count'].max():.0f} bateaux")
+                      f"to {self.dispersion_data['cape_vessel_count'].max():.0f} vessels")
                 print(f"  VLOC: {self.dispersion_data['vloc_vessel_count'].min():.0f} "
-                      f"à {self.dispersion_data['vloc_vessel_count'].max():.0f} bateaux")
+                      f"to {self.dispersion_data['vloc_vessel_count'].max():.0f} vessels")
         except Exception as e:
-            print(f"✗ Erreur chargement dispersion: {e}")
+            print(f"✗ Error loading dispersion: {e}")
             self.data_quality_report['dispersion_load_error'] = str(e)
     
     def _merge_datasets(self) -> None:
-        """Fusionner prix et dispersion sur la date."""
+        """Merge price and dispersion on date."""
         try:
-            # Fusion interne
+            # Inner merge
             merged = self.price_data.merge(
                 self.dispersion_data,
                 on='date',
                 how='inner'
             ).sort_values('date').reset_index(drop=True)
             
-            # Vérifier NaN
+            # Check NaN
             missing_count = merged.isna().sum().sum()
             if missing_count > 0:
                 merged = merged.dropna()
@@ -171,15 +171,15 @@ class DataManager:
             self.merged_data = merged
             
             if self.verbose:
-                print(f"\n✓ Fusion complète: {len(self.merged_data)} lignes communes")
+                print(f"\n✓ Merge complete: {len(self.merged_data)} common rows")
         except Exception as e:
-            print(f"✗ Erreur fusion: {e}")
+            print(f"✗ Merge error: {e}")
             self.data_quality_report['merge_error'] = str(e)
     
     def _add_basic_features(self) -> None:
-        """Ajouter les features basiques (returns, changements)."""
+        """Add basic features (returns, changes)."""
         try:
-            # Returns prix
+            # Price returns
             self.merged_data['log_return_1d'] = np.log(
                 self.merged_data['price_5tc'] / 
                 self.merged_data['price_5tc'].shift(1)
@@ -191,7 +191,7 @@ class DataManager:
                 self.merged_data['price_5tc'].shift(5)
             )
             
-            # Changements dispersion
+            # Dispersion changes
             self.merged_data['cape_disp_change_1d'] = (
                 self.merged_data['cape_dispersion'].diff()
             )
@@ -214,24 +214,24 @@ class DataManager:
             )
             
             if self.verbose:
-                print(f"✓ Features basiques ajoutées "
-                      f"(returns, changements dispersion)")
+                print(f"✓ Basic features added "
+                      f"(returns, dispersion changes)")
         except Exception as e:
-            print(f"✗ Erreur features: {e}")
+            print(f"✗ Features error: {e}")
             self.data_quality_report['feature_error'] = str(e)
     
     def get_clean_data(self, drop_na: bool = True) -> pd.DataFrame:
         """
-        Retourner dataset propre.
+        Return clean dataset.
         
         Args:
-            drop_na: Si True, supprimer les lignes avec NaN
+            drop_na: If True, remove rows with NaN
             
         Returns:
-            DataFrame prêt pour SignalGenerator
+            DataFrame ready for SignalGenerator
         """
         if self.merged_data is None:
-            raise ValueError("Pas de données fusionnées disponibles")
+            raise ValueError("No merged data available")
         
         df = self.merged_data.copy()
         
@@ -240,12 +240,12 @@ class DataManager:
             df = df.dropna()
             rows_dropped = initial_rows - len(df)
             if self.verbose and rows_dropped > 0:
-                print(f"  {rows_dropped} lignes avec NaN supprimées")
+                print(f"  {rows_dropped} rows with NaN removed")
         
         return df
     
     def get_data_summary(self) -> Dict:
-        """Retourner résumé statistique."""
+        """Return statistical summary."""
         if self.merged_data is None:
             return {}
         
@@ -286,15 +286,15 @@ class DataManager:
         }
     
     def validate_data(self) -> Dict:
-        """Valider la qualité des données."""
+        """Validate data quality."""
         if self.merged_data is None:
-            return {'status': 'error', 'message': 'Pas de données fusionnées'}
+            return {'status': 'error', 'message': 'No merged data'}
         
         df = self.get_clean_data(drop_na=True)
         
         report = {'status': 'ok', 'checks': {}}
         
-        # Outliers prix (5 std devs)
+        # Price outliers (5 std devs)
         price_mean = df['price_5tc'].mean()
         price_std = df['price_5tc'].std()
         outliers = ((df['price_5tc'] - price_mean).abs() > 5 * price_std).sum()
@@ -303,7 +303,7 @@ class DataManager:
             'status': 'ok' if outliers == 0 else 'warning'
         }
         
-        # Gaps dans continuité des dates
+        # Gaps in date continuity
         date_diffs = df['date'].diff().dt.days
         max_gap = date_diffs[1:].max()
         report['checks']['date_continuity'] = {

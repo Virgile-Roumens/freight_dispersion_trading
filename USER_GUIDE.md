@@ -1,181 +1,181 @@
-# 🚀 Guide d'Utilisation Complet - Analyse Dispersion Capesize
+# 🚀 Complete User Guide - Capesize Dispersion Analysis
 
-## ⚡ Démarrage en 3 Étapes
+## ⚡ Getting Started in 3 Steps
 
-### 1. Installer les dépendances
+### 1. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Préparer les données
-Assurez-vous d'avoir ces deux fichiers CSV dans le même répertoire que les scripts:
-- **`cape_front_month.csv`** — Prix 5TC front-month (colonnes: date, value)
-- **`dispersion_case_study.csv`** — Dispersion flotte (colonnes: date, VesselClass, VesselCount, Dispersion)
+### 2. Prepare the data
+Make sure you have these two CSV files in the same directory as the scripts:
+- **`cape_front_month.csv`** — Front-month 5TC prices (columns: date, value)
+- **`dispersion_case_study.csv`** — Fleet dispersion (columns: date, VesselClass, VesselCount, Dispersion)
 
-### 3. Lancer le dashboard
+### 3. Launch the dashboard
 ```bash
 streamlit run streamlit_app.py
 ```
 
-Puis ouvrez votre navigateur sur: **http://localhost:8501**
+Then open your browser at: **http://localhost:8501**
 
 ---
 
-## 📊 Utilisation du Dashboard
+## 📊 Dashboard Usage
 
-Le dashboard Streamlit est divisé en **5 tabs** pour une exploration progressive:
+The Streamlit dashboard is divided into **5 tabs** for progressive exploration:
 
-### Tab 1: 📊 Aperçu Données
-**Objectif**: Vérifier la qualité des données et les corrélations de base
+### Tab 1: 📊 Data Overview
+**Objective**: Verify data quality and basic correlations
 
-Ce que vous verrez:
-- **Taille de l'échantillon** et période couverte
-- **Corrélations brutes**:
-  - Capesize ↔ Prix: r = 0.32 (faible positive)
-  - VLOC ↔ Prix: r = 0.26 (faible positive)
-  - Moyenne Pondérée ↔ Prix: r = 0.27 (meilleur signal combiné)
-- **Statistiques par classe de bateau** (Capesize, VLOC)
-- **Graphique série temporelle** montrant les deux variables côte à côte
-- **Vérifications de qualité**: Outliers, continuité des dates, variance
+What you will see:
+- **Sample size** and period covered
+- **Raw correlations**:
+  - Capesize ↔ Price: r = 0.32 (weak positive)
+  - VLOC ↔ Price: r = 0.26 (weak positive)
+  - Weighted Average ↔ Price: r = 0.27 (best combined signal)
+- **Statistics by vessel class** (Capesize, VLOC)
+- **Time series chart** showing both variables side by side
+- **Quality checks**: Outliers, date continuity, variance
 
-**Interprétation Clé**:
-- Les corrélations sont **positives mais faibles** (r=0.27)
-- Cela explique seulement ~7% de la variance des prix
-- Les 93% restants sont dus à d'autres facteurs (demande fer, géopolitique, taux USD)
-- **Conclusion**: Il y a quelque chose, mais ce n'est pas dominant
-
----
-
-### Tab 2: 🎯 Explorateur de Signaux
-**Objectif**: Comprendre les deux approches de trading et comment elles fonctionnent
-
-**Signal 1: Momentum Dispersion** (5-20 jours)
-```
-Logique simple:
-- Si changement 5j dispersion > 0  → LONG
-- Si changement 5j dispersion < 0  → SHORT
-- Sinon                            → FLAT
-```
-
-*Rationale économique*:
-- La dispersion qui monte = bateaux se déplacent vers les cargos
-- Plus de bateaux disponibles où il en faut = meilleur matching offre/demande
-- Historiquement corrélé à des prix plus hauts
-
-**Signal 2: Regime (Quartiles)** (multi-semaines)
-```
-Logique simple:
-- Si dispersion dans Q3-Q4 (haut)  → LONG
-- Si dispersion dans Q1 (bas)      → SHORT
-- Si dispersion dans Q2 (moyen)    → FLAT
-```
-
-*Rationale économique*:
-- Capture l'état structurel du marché
-- Q4 (dispersion haute) = ~41% de prime vs Q1
-- Reflète l'efficacité du matching offre/demande
-
-**Ce que vous verrez**:
-- Explications détaillées de chaque signal
-- Statistiques: Jours en chaque position, retours moyens, win rates
-- Derniers signaux (15 jours)
+**Key Interpretation**:
+- Correlations are **positive but weak** (r=0.27)
+- This explains only ~7% of price variance
+- The remaining 93% is due to other factors (iron demand, geopolitics, USD rates)
+- **Conclusion**: There is something, but it's not dominant
 
 ---
 
-### Tab 3: 🏦 Résultats Backtest
-**Objectif**: Évaluer la performance historique avec frais réalistes
+### Tab 2: 🎯 Signal Explorer
+**Objective**: Understand the two trading approaches and how they work
+
+**Signal 1: Dispersion Momentum** (5-20 days)
+```
+Simple logic:
+- If 5d dispersion change > 0  → LONG
+- If 5d dispersion change < 0  → SHORT
+- Otherwise                    → FLAT
+```
+
+*Economic rationale*:
+- Rising dispersion = vessels moving towards cargoes
+- More vessels available where needed = better supply/demand matching
+- Historically correlated with higher prices
+
+**Signal 2: Regime (Quartiles)** (multi-week)
+```
+Simple logic:
+- If dispersion in Q3-Q4 (high)  → LONG
+- If dispersion in Q1 (low)      → SHORT
+- If dispersion in Q2 (medium)   → FLAT
+```
+
+*Economic rationale*:
+- Captures the structural state of the market
+- Q4 (high dispersion) = ~41% premium vs Q1
+- Reflects supply/demand matching efficiency
+
+**What you will see**:
+- Detailed explanations of each signal
+- Statistics: Days in each position, average returns, win rates
+- Recent signals (15 days)
+
+---
+
+### Tab 3: 🏦 Backtest Results
+**Objective**: Evaluate historical performance with realistic fees
 
 **Configuration**:
-- Vous contrôlez le capital initial (défaut: $1M)
-- Vous contrôlez les frais (défaut: 10 bps = coût réaliste)
-- Vous contrôlez le hard stop en drawdown (défaut: 2%)
+- You control initial capital (default: $1M)
+- You control fees (default: 10 bps = realistic cost)
+- You control hard stop on drawdown (default: 2%)
 
-**Métriques affichées**:
-| Métrique | Interprétation |
+**Displayed metrics**:
+| Metric | Interpretation |
 |----------|---|
-| **Retour Total** | 18-22% typiquement. Fort, mais vérifier d'autres métriques. |
-| **Sharpe Ratio** | 0.86 typiquement. > 0.75 = bon. C'est acceptable. |
-| **Max Drawdown** | -12% typiquement. < 15% = gérable pour commodités. |
-| **Win Rate** | 49% typiquement. ~50% est normal si gains > pertes en size. |
-| **Calmar Ratio** | Return / |Max DD|. > 2 = bon, > 1 = acceptable. |
+| **Total Return** | Typically 18-22%. Strong, but check other metrics. |
+| **Sharpe Ratio** | Typically 0.86. > 0.75 = good. This is acceptable. |
+| **Max Drawdown** | Typically -12%. < 15% = manageable for commodities. |
+| **Win Rate** | Typically 49%. ~50% is normal if gains > losses in size. |
+| **Calmar Ratio** | Return / |Max DD|. > 2 = good, > 1 = acceptable. |
 
-**Sensibilité aux frais**:
-- **Très important**: Vous verrez comment la performance dépend des frais
-- Si Sharpe baisse de 0.86 → 0.40 en passant de 0 à 10 bps: **C'est mauvais, l'edge disparaît**
-- Si Sharpe baisse de 0.86 → 0.75: **C'est OK, robuste aux frais**
+**Fee sensitivity**:
+- **Very important**: You will see how performance depends on fees
+- If Sharpe drops from 0.86 → 0.40 when going from 0 to 10 bps: **This is bad, the edge disappears**
+- If Sharpe drops from 0.86 → 0.75: **This is OK, robust to fees**
 
-**Journal des trades**:
-- Derniers 20 trades avec entry/exit price, P&L brut, frais, P&L net
-- Utilisez cela pour identifier les patterns
+**Trade log**:
+- Last 20 trades with entry/exit price, gross P&L, fees, net P&L
+- Use this to identify patterns
 
 ---
 
-### Tab 4: 📈 Analyse Économique
-**Objectif**: Comprendre *pourquoi* ça marche (ou pas)
+### Tab 4: 📈 Economic Analysis
+**Objective**: Understand *why* it works (or doesn't)
 
 **Sections**:
 
-1. **La Relation Sous-Jacente**
-   - Explique le mécanisme économique
-   - Pourquoi dispersion élevée → prix élevés
+1. **The Underlying Relationship**
+   - Explains the economic mechanism
+   - Why high dispersion → high prices
 
-2. **Evidence Statistique**
-   - Corrélations par classe (Cape, VLOC, Moyenne)
-   - Significativité
+2. **Statistical Evidence**
+   - Correlations by class (Cape, VLOC, Average)
+   - Significance
 
-3. **Analyse par Quartile**
-   - Tableau: Prix moyen par Q1/Q2/Q3/Q4
+3. **Quartile Analysis**
+   - Table: Average price by Q1/Q2/Q3/Q4
    - Q4 vs Q1 premium: ~41%
-   - Graphique en barres
+   - Bar chart
 
-4. **Risques & Limitations** (⚠️ IMPORTANT)
-   - Corrélation ≠ Causalité
-   - Relation changeante dans le temps
-   - Facteurs omis (taux, géopolitique, etc.)
-   - In-sample bias des résultats
-   - Sensibilité aux frais
-
----
-
-### Tab 5: ⚔️ Comparaison Stratégies
-**Objectif**: Décider laquelle est meilleure (Momentum vs Regime)
-
-**Ce que vous verrez**:
-- Tableau de performance côte à côte (Retour, Sharpe, Drawdown, Win Rate, Trades, Calmar)
-- Courbes d'équité superposées
-- **Recommendation Finale** basée sur Sharpe ratio
-
-**Règles de décision**:
-- **Sharpe > 0.80**: ✅ Intéressant, test forward avant production
-- **Sharpe 0.60-0.80**: ⚠️ Potentiel, mais combinable avec d'autres signaux
-- **Sharpe < 0.60**: ❌ Pas convaincant seul
+4. **Risks & Limitations** (⚠️ IMPORTANT)
+   - Correlation ≠ Causation
+   - Time-varying relationship
+   - Omitted factors (rates, geopolitics, etc.)
+   - In-sample bias of results
+   - Fee sensitivity
 
 ---
 
-## 🔧 Utilisation Programmatique (Python)
+### Tab 5: ⚔️ Strategy Comparison
+**Objective**: Decide which is better (Momentum vs Regime)
 
-Si vous voulez utiliser le système directement en code (vs le dashboard):
+**What you will see**:
+- Side-by-side performance table (Return, Sharpe, Drawdown, Win Rate, Trades, Calmar)
+- Overlaid equity curves
+- **Final Recommendation** based on Sharpe ratio
+
+**Decision rules**:
+- **Sharpe > 0.80**: ✅ Interesting, forward test before production
+- **Sharpe 0.60-0.80**: ⚠️ Potential, but should be combined with other signals
+- **Sharpe < 0.60**: ❌ Not convincing alone
+
+---
+
+## 🔧 Programmatic Usage (Python)
+
+If you want to use the system directly in code (vs the dashboard):
 
 ```python
 from data_manager import DataManager
 from signal_generator import SignalGenerator
 from backtest_engine import BacktestEngine
 
-# 1. Charger et nettoyer les données
+# 1. Load and clean the data
 dm = DataManager(
     price_csv='cape_front_month.csv',
     dispersion_csv='dispersion_case_study.csv',
-    verbose=True  # Afficher les logs
+    verbose=True  # Display logs
 )
 clean_data = dm.get_clean_data(drop_na=True)
 summary = dm.get_data_summary()
 
-# 2. Générer les signaux
+# 2. Generate signals
 sg = SignalGenerator(clean_data, verbose=True)
 signals_df = sg.get_signals_dataframe()
 signal_stats = sg.get_signal_statistics()
 
-# 3. Backtester le signal Momentum
+# 3. Backtest the Momentum signal
 engine = BacktestEngine(
     data_with_signals=signals_df,
     initial_capital=1_000_000,
@@ -185,190 +185,190 @@ engine = BacktestEngine(
 )
 results = engine.backtest_strategy('signal_momentum', 'Momentum')
 
-# 4. Afficher les résultats
+# 4. Display results
 print(f"Sharpe Ratio: {results['sharpe_ratio']:.2f}")
-print(f"Retour: {results['total_return_pct']:.1%}")
+print(f"Return: {results['total_return_pct']:.1%}")
 print(f"Max Drawdown: {results['max_drawdown_pct']:.1%}")
 print(f"Win Rate: {results['win_rate']:.1%}")
 
-# 5. Récupérer le journal des trades
+# 5. Retrieve trade log
 trade_log = engine.get_trade_log()
 print(trade_log)
 
-# 6. Récupérer la courbe d'équité
+# 6. Retrieve equity curve
 equity_vals, equity_dates = engine.get_equity_curve()
 ```
 
 ---
 
-## 📈 Interprétation des Résultats
+## 📈 Results Interpretation
 
 ### Sharpe Ratio
-Le rapport de retour par unité de risque. Plus haut = meilleur risque-ajusté.
+The return per unit of risk ratio. Higher = better risk-adjusted.
 
-- **< 0.5**: Pas bon (achetez un fonds indice)
-- **0.5-0.75**: Acceptable (classique buy-and-hold)
-- **0.75-1.0**: Bon (alpha mesurable) ← **Vous êtes ici**
-- **> 1.0**: Excellent (pratiquement jamais vu)
+- **< 0.5**: Not good (buy an index fund)
+- **0.5-0.75**: Acceptable (classic buy-and-hold)
+- **0.75-1.0**: Good (measurable alpha) ← **You are here**
+- **> 1.0**: Excellent (practically never seen)
 
 ### Max Drawdown
-La pire perte peak-to-trough de l'historique.
+The worst peak-to-trough loss in history.
 
-- **< 10%**: Excellent (très stable)
-- **10-20%**: Acceptable (gérable)
-- **> 20%**: Risqué (à éviter)
+- **< 10%**: Excellent (very stable)
+- **10-20%**: Acceptable (manageable)
+- **> 20%**: Risky (to avoid)
 
 ### Win Rate
-Le % de trades gagnants.
+The % of winning trades.
 
-- **50%**: C'est normal si (gains moy) > (pertes moy)
-- **55-60%**: Bon
+- **50%**: Normal if (avg gains) > (avg losses)
+- **55-60%**: Good
 - **> 60%**: Excellent
 
-### Sensibilité aux Frais
-**CRITIQUE**: Si la stratégie dépend complètement de zéro frais, elle n'est pas tradable.
+### Fee Sensitivity
+**CRITICAL**: If the strategy completely depends on zero fees, it is not tradable.
 
-Regardez comment Sharpe change en passant de 0 à 10 à 20 bps.
+Watch how Sharpe changes going from 0 to 10 to 20 bps.
 
 ---
 
-## ⚠️ Limitations & Honnêteté
+## ⚠️ Limitations & Honesty
 
-### Ce que VOUS devez savoir avant de trader
+### What YOU must know before trading
 
-1. **Corrélation Faible** (r=0.27)
-   - Explique seulement ~7% de la variance
-   - D'autres facteurs dominent largement
+1. **Weak Correlation** (r=0.27)
+   - Explains only ~7% of variance
+   - Other factors dominate by far
 
 2. **In-Sample Bias**
-   - Les résultats utilisent les mêmes données pour construire et tester
-   - Le forward-test sur 2024-2025 est obligatoire
+   - Results use the same data to build and test
+   - Forward-testing on 2024-2025 is mandatory
 
-3. **Régimes Changeants**
-   - La corrélation peut se briser sans préavis
-   - Testez la stabilité sur fenêtres roulantes
+3. **Changing Regimes**
+   - Correlation can break without warning
+   - Test stability on rolling windows
 
-4. **Frais Réels**
-   - L'edge diminue rapidement avec les frais
-   - 10 bps est conservateur; les vrais frais peuvent être plus hauts
+4. **Real Fees**
+   - Edge decreases rapidly with fees
+   - 10 bps is conservative; real fees may be higher
 
-5. **Facteurs Omis**
-   - Prix du fer, taux USD, géopolitique, sentiment
-   - Affectent les prix bien plus que la dispersion
+5. **Omitted Factors**
+   - Iron ore prices, USD rates, geopolitics, sentiment
+   - Affect prices far more than dispersion
 
-### Ce que le projet fait BIEN
+### What the project does WELL
 
-✅ Pas de machine learning complexe (pas d'overfitting)
-✅ Règles simples et explicables
-✅ Transparence complète (chaque paramètre visible)
-✅ Frais intégrés (pas de fantasmes)
-✅ Reconnaît les limitations (ce document même!)
-
----
-
-## 📋 Recommandations Avant Production
-
-Si vous trouvez le Sharpe > 0.80:
-
-1. **Forward-test**: Validez sur 2024-2025 (données futures indépendantes)
-2. **Stable ça?**: Testez les corrélations rolling (fenêtres de 60 jours)
-3. **Diversifiez**: Ne tradez jamais sur un seul signal
-4. **Combinez**: Ajoutez des signaux complémentaires
-5. **Papier d'abord**: 1-2 mois en papier avant capital réel
-6. **Position sizing**: Commencez petit (1% du capital par trade)
-7. **Monitoring**: Suivez la corrélation en temps réel (elle peut se briser)
+✅ No complex machine learning (no overfitting)
+✅ Simple and explainable rules
+✅ Complete transparency (every parameter visible)
+✅ Fees integrated (no fantasies)
+✅ Acknowledges limitations (this very document!)
 
 ---
 
-## 🎯 Pour Votre Présentation / Interview
+## 📋 Recommendations Before Production
 
-### Version 30 Secondes:
-> "J'ai étudié si la dispersion des bateaux Capesize/VLOC prédisait les prix 5TC. 
-> J'ai trouvé une corrélation positive faible et stable (r=0.27). 
-> Un système simple (Momentum + Regime Filter) génère 18% annualisés avec Sharpe 0.86. 
-> Mais les frais dégradent rapidement, et la corrélation faible suggère que d'autres facteurs dominent. 
-> C'est intéressant mais insuffisant seul. À combiner avec d'autres signaux."
+If you find Sharpe > 0.80:
 
-### Points à Mentionner:
-✅ **Honnête sur les limitations** (faible corrélation)
-✅ **Approche statistique simple** (pas de black-box ML)
-✅ **Résultats réalistes** (pas overfitté)
-✅ **Reconnaît les frais** (pas de fantasmes)
-✅ **Propose d'améliorer** (combine avec d'autres)
+1. **Forward-test**: Validate on 2024-2025 (independent future data)
+2. **Is it stable?**: Test rolling correlations (60-day windows)
+3. **Diversify**: Never trade on a single signal
+4. **Combine**: Add complementary signals
+5. **Paper first**: 1-2 months in paper trading before real capital
+6. **Position sizing**: Start small (1% of capital per trade)
+7. **Monitoring**: Track correlation in real-time (it can break)
 
-### À Montrer:
-1. **Tab "Data Overview"** → "Voici la corrélation faible mais positive"
-2. **Tab "Economic Analysis"** → "Les prix Q4 vs Q1 sont significativement différents"
-3. **Tab "Backtest Results avec frais"** → "Ça tient compte des coûts réels"
-4. **Tab "Strategy Comparison"** → "Momentum surperforme légèrement"
+---
+
+## 🎯 For Your Presentation / Interview
+
+### 30-Second Version:
+> "I studied whether Capesize/VLOC vessel dispersion predicted 5TC prices. 
+> I found a weak but stable positive correlation (r=0.27). 
+> A simple system (Momentum + Regime Filter) generates 18% annualized with Sharpe 0.86. 
+> But fees degrade it quickly, and the weak correlation suggests other factors dominate. 
+> It's interesting but insufficient alone. Should be combined with other signals."
+
+### Points to Mention:
+✅ **Honest about limitations** (weak correlation)
+✅ **Simple statistical approach** (no black-box ML)
+✅ **Realistic results** (not overfitted)
+✅ **Acknowledges fees** (no fantasies)
+✅ **Proposes improvements** (combine with others)
+
+### What to Show:
+1. **Tab "Data Overview"** → "Here is the weak but positive correlation"
+2. **Tab "Economic Analysis"** → "Q4 vs Q1 prices are significantly different"
+3. **Tab "Backtest Results with fees"** → "This accounts for real costs"
+4. **Tab "Strategy Comparison"** → "Momentum slightly outperforms"
 
 ---
 
 ## 🐛 Troubleshooting
 
 ### "ModuleNotFoundError: No module named 'pandas'"
-→ Installer les dépendances: `pip install -r requirements.txt`
+→ Install dependencies: `pip install -r requirements.txt`
 
 ### "FileNotFoundError: cape_front_month.csv"
-→ Vérifiez que les deux CSV sont dans le même répertoire que les scripts
+→ Verify that both CSVs are in the same directory as the scripts
 
 ### "ValueError: No data matches the given selection criteria"
-→ Vérifiez les formats des CSV (dates, colonnes)
+→ Check CSV formats (dates, columns)
 
-### "Streamlit page ne se charge pas"
-→ Attendre 30s au premier lancement (cache)
-→ Vérifier que port 8501 est disponible: `streamlit run streamlit_app.py --logger.level=debug`
+### "Streamlit page won't load"
+→ Wait 30s on first launch (cache)
+→ Check that port 8501 is available: `streamlit run streamlit_app.py --logger.level=debug`
 
-### "Les résultats ne correspondent pas à l'exemple"
-→ Vérifiez les paramètres (capital, frais, hard stop)
-→ Vérifiez que les deux CSV couvrent les mêmes dates
-
----
-
-## 📚 Pour Aller Plus Loin
-
-### Améliorations Possibles:
-1. **Autres signaux**: Momentum prix, volatilité, mean-reversion
-2. **Filtres**: Ajouter des conditions supplémentaires avant le trade
-3. **Position sizing**: Ajuster la taille selon la confiance du signal
-4. **Dynamic parameters**: Ajuster les seuils selon l'environnement
-5. **Machine learning**: Après validation de la base statistique
-
-### Lectures Recommandées:
-- "A Man for All Markets" - Ed Thorp (trading quantitatif)
-- "Python for Finance" - Yves Hilpisch (implémentation)
-- Papers sur le shipping et les freight rates
+### "Results don't match the example"
+→ Check parameters (capital, fees, hard stop)
+→ Verify that both CSVs cover the same dates
 
 ---
 
-## 💬 Questions Fréquentes
+## 📚 Going Further
 
-**Q: Pourquoi deux signaux au lieu d'un?**
-A: Ils capturent des choses différentes (court-terme vs structurel). Utile de voir les deux perspectives.
+### Possible Improvements:
+1. **Other signals**: Price momentum, volatility, mean-reversion
+2. **Filters**: Add additional conditions before trading
+3. **Position sizing**: Adjust size based on signal confidence
+4. **Dynamic parameters**: Adjust thresholds based on environment
+5. **Machine learning**: After validating the statistical foundation
 
-**Q: Pourquoi seulement 60 jours de lookback pour z-scores?**
-A: Balance entre adapt. rapide et stabilité. Testez 30, 90, 120 si vous voulez.
+### Recommended Reading:
+- "A Man for All Markets" - Ed Thorp (quantitative trading)
+- "Python for Finance" - Yves Hilpisch (implementation)
+- Papers on shipping and freight rates
 
-**Q: Puis-je modifier les paramètres (thresholds, lookabacks)?**
-A: Oui, mais testez toujours forward après! Pas d'optimisation sur les mêmes données.
+---
 
-**Q: Puis-je utiliser cela pour d'autres contrats de shipping?**
-A: Oui! Panamax, Handy-size, etc. Le logic reste similaire.
+## 💬 Frequently Asked Questions
 
-**Q: Est-ce garanti de marcher en avenir?**
-A: Non. Backtesting ≠ résultats futurs. Le forward-test est obligatoire.
+**Q: Why two signals instead of one?**
+A: They capture different things (short-term vs structural). Useful to see both perspectives.
+
+**Q: Why only 60 days lookback for z-scores?**
+A: Balance between fast adaptation and stability. Test 30, 90, 120 if you want.
+
+**Q: Can I modify parameters (thresholds, lookbacks)?**
+A: Yes, but always forward test afterwards! No optimization on the same data.
+
+**Q: Can I use this for other shipping contracts?**
+A: Yes! Panamax, Handy-size, etc. The logic remains similar.
+
+**Q: Is it guaranteed to work in the future?**
+A: No. Backtesting ≠ future results. Forward-testing is mandatory.
 
 ---
 
 ## 📝 Disclaimers
 
-- ⚠️ **Backtesting ≠ Garantie Futur**: Résultats passés ne prédisent pas résultats futurs
-- ⚠️ **Research Only**: À utiliser uniquement pour éducation et recherche
-- ⚠️ **Pas Conseil Financier**: Consultez un pro avant capital réel
-- ⚠️ **Risque Total**: Le trading comporte des risques. Vous pouvez perdre argent.
+- ⚠️ **Backtesting ≠ Future Guarantee**: Past results do not predict future results
+- ⚠️ **Research Only**: To be used only for education and research
+- ⚠️ **Not Financial Advice**: Consult a professional before using real capital
+- ⚠️ **Total Risk**: Trading involves risks. You can lose money.
 
 ---
 
-**Fait par un quant engineer, pour traders fondamentaux.** 🚢
+**Built by a quant engineer, for fundamental traders.** 🚢
 
-*Mis à jour: 17 décembre 2025*
+*Last updated: December 17, 2025*
