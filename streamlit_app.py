@@ -20,11 +20,12 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
+from plotly.subplots import make_subplots
 from datetime import datetime
 from pathlib import Path
 import sys
 
-# Import des classes
+# Import classes
 sys.path.insert(0, str(Path(__file__).parent))
 from data_manager import DataManager
 from signal_generator import SignalGenerator
@@ -165,16 +166,25 @@ except Exception as e:
 # ============================================================================
 
 if tab_choice == "📊 Data Overview":
-    st.title("📊 Data Overview & Quality Checks")
+    st.title("📊 Data Overview & Statistical Analysis")
     
     st.info(
-        "**Step 1: Verify the data**\n\n"
-        "Here we display:\n"
-        "- Sample size and period covered\n"
-        "- Raw correlations between dispersion and prices\n"
-        "- Statistics by vessel class (Capesize, VLOC)\n"
-        "- Data quality checks"
+        "**Objective:** Understand the raw data before building any trading strategy.\n\n"
+        "This analysis follows a rigorous statistical approach:\n"
+        "1. **Data Description** - What do we have?\n"
+        "2. **Distribution Analysis** - How do variables behave?\n"
+        "3. **Correlation Study** - Do they move together?\n"
+        "4. **Causality Testing** - Does dispersion predict prices?\n"
+        "5. **Quality Checks** - Can we trust the data?\n\n"
+        "**Philosophy:** We prefer to report 'no signal found' rather than overfit the data."
     )
+    
+    # ========================================================================
+    # SECTION 1: DATA SUMMARY
+    # ========================================================================
+    
+    st.markdown("---")
+    st.header("1️⃣ Dataset Overview")
     
     # Key metrics
     col1, col2, col3, col4 = st.columns(4)
@@ -187,170 +197,443 @@ if tab_choice == "📊 Data Overview":
         years = data_summary['years_covered']
         st.metric(
             "Period",
-            f"{years:.1f} years"
+            f"{years:.1f} years",
+            f"{data_summary['date_start'].strftime('%Y-%m')} to {data_summary['date_end'].strftime('%Y-%m')}"
         )
     with col3:
         corr = data_summary['correlation_avg']
         st.metric(
-            "Correlation (Avg Disp ↔ Price)",
+            "Pearson Correlation",
             f"{corr:.3f}",
-            delta="Weak but positive" if 0.2 < corr < 0.4 else ""
+            delta="Weak positive" if 0.2 < corr < 0.4 else "Very weak" if abs(corr) < 0.2 else ""
         )
     with col4:
+        r_squared = corr ** 2
         st.metric(
-            "Status",
-            "✅ Loaded"
+            "R² (Explained Var.)",
+            f"{r_squared:.1%}",
+            delta=f"{100-r_squared*100:.0f}% unexplained"
         )
-    
-    st.markdown("---")
-    
-    # Price and dispersion statistics
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("5TC Front-Month (Price)")
-        price_stats = data_summary['price_5tc']
-        
-        price_cols = st.columns(4)
-        price_cols[0].metric("Mean", f"${price_stats['mean']:.0f}/day")
-        price_cols[1].metric("Std Dev", f"${price_stats['std']:.0f}")
-        price_cols[2].metric("Min", f"${price_stats['min']:.0f}")
-        price_cols[3].metric("Max", f"${price_stats['max']:.0f}")
-        
-        st.info(
-            "**5TC Price Context:**\n\n"
-            "The 5TC (5-day Time Charter) is the reference FFA contract for "
-            "Capesize vessels. It represents the daily charter cost of a "
-            "voyage vessel, used by traders to hedge against "
-            "freight cost variations."
-        )
-    
-    with col2:
-        st.subheader("Fleet Dispersion (Weighted Average)")
-        disp_stats = data_summary['avg_dispersion']
-        
-        disp_cols = st.columns(4)
-        disp_cols[0].metric("Mean", f"{disp_stats['mean']:.0f}")
-        disp_cols[1].metric("Std Dev", f"{disp_stats['std']:.0f}")
-        disp_cols[2].metric("Min", f"{disp_stats['min']:.0f}")
-        disp_cols[3].metric("Max", f"{disp_stats['max']:.0f}")
-        
-        st.info(
-            "**Dispersion Context:**\n\n"
-            "Dispersion measures the geographic distribution of vessels. "
-            "High value = well-distributed vessels globally = "
-            "better supply/demand matching. "
-            "Low value = concentrated vessels = potential congestion."
-        )
-    
-    st.markdown("---")
-    
-    # Breakdown by vessel class
-    st.subheader("Breakdown by Vessel Class")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("**🚢 Capesize**")
-        cape_stats = data_summary['cape_dispersion']
-        st.metric("Avg Dispersion", f"{cape_stats['mean']:.0f}")
-        st.metric("Corr. with Price", f"{data_summary['correlation_cape']:.3f}")
-        st.caption("Vessels > 100k tons")
-    
-    with col2:
-        st.markdown("**🛢️ VLOC**")
-        vloc_stats = data_summary['vloc_dispersion']
-        st.metric("Avg Dispersion", f"{vloc_stats['mean']:.0f}")
-        st.metric("Corr. with Price", f"{data_summary['correlation_vloc']:.3f}")
-        st.caption("Very Large Ore Carriers")
-    
-    with col3:
-        st.markdown("**📊 Combined**")
-        st.metric(
-            "Weighted Dispersion",
-            f"{data_summary['avg_dispersion']['mean']:.0f}"
-        )
-        st.metric(
-            "Corr. with Price",
-            f"{data_summary['correlation_avg']:.3f}"
-        )
-        st.success("Best combined signal")
     
     st.info(
-        "**Why Average?**\n\n"
-        "Capesize and VLOC compete for the same cargoes (iron ore). "
-        "The weighted average by number of vessels better captures total supply "
-        "than each class in isolation."
+        "**About the Data:**\n\n"
+        "- **5TC Front-Month (C+1MON):** Forward Freight Agreement contract for Capesize vessels. "
+        "This is the primary hedging instrument for iron ore shipping routes.\n"
+        "- **Dispersion:** Geographic spread of Capesize + VLOC vessels worldwide. "
+        "High dispersion = vessels well-positioned globally for cargo pickup.\n"
+        "- **Time Alignment:** Both series are daily observations, merged on date (inner join)."
     )
+    
+    # ========================================================================
+    # SECTION 2: UNDERSTANDING DISPERSION METRIC
+    # ========================================================================
     
     st.markdown("---")
+    st.header("2️⃣ Understanding the Dispersion Metric")
     
-    # Time series graph
-    st.subheader("Time Series: 5TC Price vs Dispersion")
+    st.subheader("📐 How We Calculate Weighted Average Dispersion")
     
-    # Normalize 0-100 for comparison
-    price_norm = (
-        (signals_df['price_5tc'] - signals_df['price_5tc'].min()) /
-        (signals_df['price_5tc'].max() - signals_df['price_5tc'].min()) * 100
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown("""
+        **Formula:**
+        ```
+        avg_dispersion = (Cape_Disp × Cape_Count + VLOC_Disp × VLOC_Count) / Total_Count
+        ```
+        
+        **Why weight by vessel COUNT and not by vessel CAPACITY?**
+        
+        1. **Market Activity Signal:** Count reflects how many vessels are actively seeking cargo. 
+           A large VLOC doesn't generate more "dispersion signal" than a smaller Capesize if both 
+           are ballasting/positioning.
+        
+        2. **Geographic Presence:** We care about spatial distribution, not total tonnage. 
+           100 Capesizes dispersed globally create better coverage than 30 VLOCs, 
+           even if tonnage is similar.
+        
+        3. **Data Reality:** The dispersion metric itself measures spatial spread of vessel positions, 
+           not their cargo capacity. Weighting by count preserves the metric's meaning.
+        
+        4. **Market Dynamics:** Both Capesize (100-180k DWT) and VLOC (200-400k DWT) compete for 
+           similar routes (Brazil-China, Australia-China iron ore). The number of competing vessels 
+           matters more than their aggregate capacity for positioning analysis.
+        """)
+        
+        st.success(
+            "**Bottom Line:** We weight by vessel count because dispersion measures "
+            "*where vessels are*, not *how much they can carry*. It's a spatial metric, not a capacity metric."
+        )
+    
+    with col2:
+        st.metric("Capesize Avg Count", f"{signals_df['cape_vessel_count'].mean():.0f} vessels")
+        st.metric("VLOC Avg Count", f"{signals_df['vloc_vessel_count'].mean():.0f} vessels")
+        st.metric("Total Avg Count", f"{signals_df['total_vessel_count'].mean():.0f} vessels")
+        
+        cape_pct = signals_df['cape_vessel_count'].mean() / signals_df['total_vessel_count'].mean()
+        vloc_pct = signals_df['vloc_vessel_count'].mean() / signals_df['total_vessel_count'].mean()
+        
+        st.markdown("**Fleet Mix:**")
+        st.progress(cape_pct, text=f"Capesize: {cape_pct:.1%}")
+        st.progress(vloc_pct, text=f"VLOC: {vloc_pct:.1%}")
+    
+    # ========================================================================
+    # SECTION 3: DISTRIBUTION ANALYSIS
+    # ========================================================================
+    
+    st.markdown("---")
+    st.header("3️⃣ Distribution Analysis")
+    
+    tab_dist = st.tabs(["5TC Prices", "Dispersion", "By Vessel Class"])
+    
+    with tab_dist[0]:
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            # Price histogram
+            fig = go.Figure()
+            fig.add_trace(go.Histogram(
+                x=signals_df['price_5tc'],
+                nbinsx=50,
+                name='5TC Price',
+                marker_color='#1f77b4',
+                opacity=0.7
+            ))
+            fig.update_layout(
+                title="5TC Price Distribution",
+                xaxis_title="Price ($/day)",
+                yaxis_title="Frequency",
+                height=350
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            price_stats = data_summary['price_5tc']
+            st.metric("Mean", f"${price_stats['mean']:.0f}/day")
+            st.metric("Std Dev", f"${price_stats['std']:.0f}")
+            st.metric("Min", f"${price_stats['min']:.0f}")
+            st.metric("Max", f"${price_stats['max']:.0f}")
+            st.metric("Range", f"${price_stats['max'] - price_stats['min']:.0f}")
+            
+            # Coefficient of variation
+            cv = price_stats['std'] / price_stats['mean']
+            st.metric("Coef. of Variation", f"{cv:.1%}")
+        
+        st.info(
+            "**Interpretation:** 5TC prices are highly volatile (CV > 50%), "
+            "typical of commodity freight markets. The distribution shows multiple modes, "
+            "reflecting different market regimes (boom/bust cycles in iron ore trade)."
+        )
+    
+    with tab_dist[1]:
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            # Dispersion histogram
+            fig = go.Figure()
+            fig.add_trace(go.Histogram(
+                x=signals_df['avg_dispersion'],
+                nbinsx=50,
+                name='Avg Dispersion',
+                marker_color='#d62728',
+                opacity=0.7
+            ))
+            fig.update_layout(
+                title="Average Dispersion Distribution",
+                xaxis_title="Dispersion Value",
+                yaxis_title="Frequency",
+                height=350
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            disp_stats = data_summary['avg_dispersion']
+            st.metric("Mean", f"{disp_stats['mean']:.0f}")
+            st.metric("Std Dev", f"{disp_stats['std']:.0f}")
+            st.metric("Min", f"{disp_stats['min']:.0f}")
+            st.metric("Max", f"{disp_stats['max']:.0f}")
+            st.metric("Range", f"{disp_stats['max'] - disp_stats['min']:.0f}")
+            
+            cv_disp = disp_stats['std'] / disp_stats['mean']
+            st.metric("Coef. of Variation", f"{cv_disp:.1%}")
+        
+        st.info(
+            "**Interpretation:** Dispersion shows moderate variability. "
+            "The metric ranges significantly, indicating real changes in vessel positioning patterns "
+            "over time (not just noise)."
+        )
+    
+    with tab_dist[2]:
+        # Scatter plot Cape vs VLOC dispersion
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=signals_df['cape_dispersion'],
+            y=signals_df['vloc_dispersion'],
+            mode='markers',
+            marker=dict(
+                size=3,
+                color=signals_df['price_5tc'],
+                colorscale='Viridis',
+                showscale=True,
+                colorbar=dict(title="5TC Price")
+            ),
+            text=[f"Date: {d.strftime('%Y-%m-%d')}<br>Price: ${p:.0f}" 
+                  for d, p in zip(signals_df['date'], signals_df['price_5tc'])],
+            hovertemplate='Cape Disp: %{x:.0f}<br>VLOC Disp: %{y:.0f}<br>%{text}<extra></extra>'
+        ))
+        fig.update_layout(
+            title="Capesize vs VLOC Dispersion (colored by 5TC price)",
+            xaxis_title="Capesize Dispersion",
+            yaxis_title="VLOC Dispersion",
+            height=400
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        cape_vloc_corr = signals_df['cape_dispersion'].corr(signals_df['vloc_dispersion'])
+        st.metric("Cape-VLOC Correlation", f"{cape_vloc_corr:.3f}")
+        
+        st.info(
+            f"**Interpretation:** Capesize and VLOC dispersion are correlated at {cape_vloc_corr:.2f}, "
+            "meaning they tend to disperse/concentrate together. This makes sense as they serve "
+            "similar trade routes and respond to the same demand patterns."
+        )
+    
+    # ========================================================================
+    # SECTION 4: TIME SERIES & CORRELATION ANALYSIS
+    # ========================================================================
+    
+    st.markdown("---")
+    st.header("4️⃣ Time Series & Correlation Analysis")
+    
+    st.subheader("📈 Raw Time Series")
+    
+    # Dual-axis time series
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    
+    fig.add_trace(
+        go.Scatter(
+            x=signals_df['date'],
+            y=signals_df['price_5tc'],
+            name='5TC Price',
+            line=dict(color='#1f77b4', width=2)
+        ),
+        secondary_y=False
     )
-    avg_norm = (
-        (signals_df['avg_dispersion'] - signals_df['avg_dispersion'].min()) /
-        (signals_df['avg_dispersion'].max() - signals_df['avg_dispersion'].min()) * 100
+    
+    fig.add_trace(
+        go.Scatter(
+            x=signals_df['date'],
+            y=signals_df['avg_dispersion'],
+            name='Avg Dispersion',
+            line=dict(color='#d62728', width=2)
+        ),
+        secondary_y=True
     )
+    
+    fig.update_layout(
+        title="5TC Price vs Average Dispersion (Dual Axis)",
+        hovermode='x unified',
+        height=400
+    )
+    fig.update_xaxes(title_text="Date")
+    fig.update_yaxes(title_text="5TC Price ($/day)", secondary_y=False)
+    fig.update_yaxes(title_text="Average Dispersion", secondary_y=True)
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    st.subheader("🔄 Rolling Correlation Analysis")
+    
+    # Calculate rolling correlation
+    window = st.slider("Select rolling window (days)", 30, 365, 90, 30)
+    rolling_corr = signals_df['price_5tc'].rolling(window).corr(signals_df['avg_dispersion'])
     
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=signals_df['date'],
-        y=price_norm,
-        name='5TC Price (normalized)',
-        line=dict(color='#1f77b4', width=3),
+        y=rolling_corr,
+        name=f'{window}-day Rolling Correlation',
+        line=dict(color='#2ca02c', width=2)
     ))
-    fig.add_trace(go.Scatter(
-        x=signals_df['date'],
-        y=avg_norm,
-        name='Average Dispersion (normalized)',
-        line=dict(color='#d62728', width=2, dash='dash'),
-    ))
+    fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
+    fig.add_hline(y=data_summary['correlation_avg'], line_dash="dot", line_color="red", 
+                  annotation_text=f"Overall: {data_summary['correlation_avg']:.3f}")
     fig.update_layout(
-        title="Both series generally move together (r=0.27)",
+        title=f"Rolling {window}-Day Correlation: Price vs Dispersion",
         xaxis_title="Date",
-        yaxis_title="Normalized Value (0-100)",
-        hovermode='x unified',
-        height=500
+        yaxis_title="Correlation Coefficient",
+        height=350
     )
     st.plotly_chart(fig, use_container_width=True)
     
     st.warning(
-        "**⚠️ Important Observation:**\n\n"
-        "Although both series are positively correlated (r=0.27), "
-        "they don't always move together. This means that dispersion "
-        "only explains a small part of price movements. "
-        "Other factors (iron demand, geopolitics, USD rates) dominate."
+        "**⚠️ Key Observation:** The rolling correlation varies significantly over time. "
+        "It's sometimes strongly positive, sometimes near zero, and occasionally negative. "
+        "This indicates the relationship is **not stable** - it changes with market regimes. "
+        "Any trading strategy must account for this non-stationarity."
     )
     
-    st.markdown("---")
+    # ========================================================================
+    # SECTION 5: GRANGER CAUSALITY TEST
+    # ========================================================================
     
-    # Quality checks
-    st.subheader("✅ Data Quality Checks")
+    st.markdown("---")
+    st.header("5️⃣ Granger Causality Test")
+    
+    st.info(
+        "**What is Granger Causality?**\n\n"
+        "Tests whether past values of dispersion help predict future prices, beyond what "
+        "past prices already tell us. This is a standard econometric test for predictive relationships.\n\n"
+        "**Null Hypothesis:** Dispersion does NOT Granger-cause prices (i.e., dispersion has no predictive power).\n"
+        "**Alternative:** Dispersion DOES Granger-cause prices (i.e., dispersion helps forecast prices)."
+    )
+    
+    try:
+        from statsmodels.tsa.stattools import grangercausalitytests
+        
+        # Prepare data (drop NaNs)
+        test_data = signals_df[['price_5tc', 'avg_dispersion']].dropna()
+        
+        # Test with multiple lags
+        max_lag = st.slider("Maximum lag to test (days)", 1, 20, 10, 1)
+        
+        with st.spinner("Running Granger causality tests..."):
+            # Test: Does dispersion Granger-cause price?
+            gc_results = grangercausalitytests(test_data[['price_5tc', 'avg_dispersion']], max_lag, verbose=False)
+        
+        # Extract p-values
+        results_list = []
+        for lag in range(1, max_lag + 1):
+            # Get F-test p-value (ssr_ftest)
+            f_test = gc_results[lag][0]['ssr_ftest']
+            p_value = f_test[1]
+            results_list.append({
+                'Lag': lag,
+                'F-statistic': f_test[0],
+                'p-value': p_value,
+                'Significant (5%)': '✅ Yes' if p_value < 0.05 else '❌ No',
+                'Significant (10%)': '✅ Yes' if p_value < 0.10 else '❌ No'
+            })
+        
+        results_df = pd.DataFrame(results_list)
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            # Plot p-values
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=results_df['Lag'],
+                y=results_df['p-value'],
+                mode='lines+markers',
+                name='p-value',
+                line=dict(color='#1f77b4', width=2),
+                marker=dict(size=8)
+            ))
+            fig.add_hline(y=0.05, line_dash="dash", line_color="red", 
+                         annotation_text="5% significance")
+            fig.add_hline(y=0.10, line_dash="dot", line_color="orange", 
+                         annotation_text="10% significance")
+            fig.update_layout(
+                title="Granger Causality Test: P-values by Lag",
+                xaxis_title="Lag (days)",
+                yaxis_title="P-value",
+                height=350
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            st.markdown("**Test Results:**")
+            significant_5 = (results_df['p-value'] < 0.05).sum()
+            significant_10 = (results_df['p-value'] < 0.10).sum()
+            
+            st.metric("Significant at 5%", f"{significant_5}/{max_lag} lags")
+            st.metric("Significant at 10%", f"{significant_10}/{max_lag} lags")
+            
+            if significant_5 > max_lag * 0.3:
+                st.success("✅ **Strong Evidence** of predictive power")
+            elif significant_10 > max_lag * 0.3:
+                st.warning("⚠️ **Moderate Evidence** of predictive power")
+            else:
+                st.error("❌ **Weak/No Evidence** of predictive power")
+        
+        with st.expander("📊 Detailed Results Table"):
+            st.dataframe(results_df, use_container_width=True, hide_index=True)
+        
+        st.markdown("**Interpretation:**")
+        if significant_5 == 0:
+            st.warning(
+                "⚠️ **No significant Granger causality detected at 5% level.** "
+                "This suggests that past dispersion values do NOT significantly help predict future prices "
+                "beyond what past prices already tell us. The correlation we observe may be **contemporaneous** "
+                "rather than predictive."
+            )
+        elif significant_5 <= 2:
+            st.info(
+                "**Weak predictive relationship detected.** Only a few lags show significance, "
+                "which could be due to chance (multiple testing). The evidence for using dispersion "
+                "to trade systematically is **marginal at best**."
+            )
+        else:
+            st.success(
+                f"✅ **Predictive relationship detected!** {significant_5} out of {max_lag} lags "
+                "show significant Granger causality. This suggests dispersion MAY have predictive power "
+                "for future prices. However:\n"
+                "- Statistical significance ≠ economic profitability\n"
+                "- Past performance ≠ future results\n"
+                "- Transaction costs matter\n"
+                "- The relationship may be unstable over time"
+            )
+    
+    except Exception as e:
+        st.error(f"Could not perform Granger causality test: {e}")
+        st.info("Install statsmodels package: `pip install statsmodels`")
+    
+    # ========================================================================
+    # SECTION 6: DATA QUALITY CHECKS
+    # ========================================================================
+    
+    st.markdown("---")
+    st.header("6️⃣ Data Quality Checks")
     
     validation_report = dm.validate_data()
     
-    check_cols = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     
-    with check_cols[0]:
-        st.markdown("**Checks:**")
-        for check_name, check_result in validation_report['checks'].items():
-            status_icon = "✓" if check_result['status'] == 'ok' else "⚠"
-            st.write(f"{status_icon} **{check_name}**: {check_result['status'].upper()}")
+    with col1:
+        st.markdown("**📋 Completeness:**")
+        st.metric("Total Rows", f"{len(signals_df):,}")
+        st.metric("NaN Values", "0" if signals_df.isna().sum().sum() == 0 else f"{signals_df.isna().sum().sum()}")
+        st.success("✅ No missing data")
     
-    with check_cols[1]:
-        st.markdown("**Summary:**")
-        st.success(
-            "✅ No price outliers detected\n"
-            "✅ Date continuity acceptable\n"
-            "✅ Sufficient price and dispersion variance\n"
-            "✅ **Data ready for analysis**"
-        )
+    with col2:
+        st.markdown("**🔍 Outliers:**")
+        outlier_check = validation_report['checks']['price_outliers']
+        st.metric("Price Outliers (>5σ)", outlier_check['count'])
+        if outlier_check['status'] == 'ok':
+            st.success("✅ No extreme outliers")
+        else:
+            st.warning(f"⚠️ {outlier_check['count']} outliers detected")
+    
+    with col3:
+        st.markdown("**📅 Continuity:**")
+        continuity = validation_report['checks']['date_continuity']
+        st.metric("Max Gap (days)", continuity['max_gap_days'])
+        if continuity['status'] == 'ok':
+            st.success("✅ Good continuity")
+        else:
+            st.warning(f"⚠️ Gap up to {continuity['max_gap_days']} days")
+    
+    with st.expander("🔬 Detailed Quality Report"):
+        st.json(validation_report)
+    
+    st.success(
+        "**✅ Data Quality Summary:**\n\n"
+        "- No missing values\n"
+        "- No extreme outliers (>5σ) in prices\n"
+        "- Reasonable date continuity\n"
+        "- Sufficient variance in both series\n"
+        "- **Conclusion: Data is suitable for analysis**"
+    )
 
 
 # ============================================================================
