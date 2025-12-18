@@ -29,9 +29,6 @@ The Engelhart Freight Analytics Platform analyzes the relationship between Capes
 ### Installation
 
 1. **Clone or download the repository**
-```bash
-cd c:\Users\Virgile ROUMENS\Desktop\Engelhart\freight_project
-```
 
 2. **Install dependencies**
 ```bash
