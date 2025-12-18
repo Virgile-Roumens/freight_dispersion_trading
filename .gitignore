@@ -4,6 +4,10 @@ __pycache__/
 *$py.class
 *.so
 .Python
+build/
+dist/
+*.egg-info/
+*.egg
 
 # Virtual environments
 venv/
@@ -15,6 +19,7 @@ ENV/
 .idea/
 *.swp
 *.swo
+*.code-workspace
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -22,6 +27,20 @@ ENV/
 # Export folder - backtest results
 export/
 
+# Archived documentation
+docs_archive/
+
+# Logs
+*.log
+
 # OS files
 .DS_Store
 Thumbs.db
+*~
+
+# Temporary files
+*.tmp
+*.bak
+
+# Data files (uncomment if datasets are large)
+# data/*.csv

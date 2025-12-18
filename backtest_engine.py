@@ -14,6 +14,15 @@ import numpy as np
 from typing import Dict, Tuple, List
 from datetime import datetime
 from pathlib import Path
+import warnings
+
+# FRED API for risk-free rate
+try:
+    from fredapi import Fred
+    FRED_AVAILABLE = True
+except ImportError:
+    FRED_AVAILABLE = False
+    warnings.warn("fredapi not installed. Install with: pip install fredapi")
 
 
 class BacktestEngine:
@@ -47,11 +56,53 @@ class BacktestEngine:
         self.initial_capital = initial_capital
         self.fee_bps = transaction_fee_bps / 10000  # Convert to decimal
         
+        # FRED API setup for risk-free rate
+        self.fred_api_key = "dddf15f3c59a3d9c5c331ecabed8a160"
+        self.risk_free_rate = None  # Will be fetched dynamically
+        
         # Store results
         self.results = {}
         self.trade_log = []
         self.equity_curve = []
         self.dates_equity = []
+    
+    def _fetch_risk_free_rate(self) -> float:
+        """
+        Fetch current US 10Y Treasury yield from FRED API.
+        Falls back to 2% if API unavailable.
+        
+        Returns:
+            Annual risk-free rate as decimal (e.g., 0.045 for 4.5%)
+        """
+        if not FRED_AVAILABLE:
+            warnings.warn("FRED API not available. Using default 2% risk-free rate.")
+            return 0.02
+        
+        try:
+            fred = Fred(api_key=self.fred_api_key)
+            # DGS10 = 10-Year Treasury Constant Maturity Rate
+            treasury_10y = fred.get_series('DGS10', observation_start=self.data['date'].min())
+            
+            # Get the average rate over the backtest period
+            # Filter to backtest date range
+            backtest_start = self.data['date'].min()
+            backtest_end = self.data['date'].max()
+            treasury_10y = treasury_10y[
+                (treasury_10y.index >= backtest_start) & 
+                (treasury_10y.index <= backtest_end)
+            ]
+            
+            if len(treasury_10y) > 0:
+                # Use mean rate over period, convert from percentage to decimal
+                avg_rate = treasury_10y.mean() / 100
+                return avg_rate
+            else:
+                warnings.warn("No Treasury data for backtest period. Using default 2%.")
+                return 0.02
+                
+        except Exception as e:
+            warnings.warn(f"Error fetching FRED data: {e}. Using default 2%.")
+            return 0.02
     
     def backtest_strategy(
         self,
@@ -68,6 +119,9 @@ class BacktestEngine:
         Returns:
             Dict with results (Sharpe, Return, Drawdown, etc.)
         """
+        # Fetch risk-free rate for this backtest period
+        self.risk_free_rate = self._fetch_risk_free_rate()
+        
         # Reset
         self.trade_log = []
         self.equity_curve = [self.initial_capital]
@@ -169,7 +223,15 @@ class BacktestEngine:
         
         # Basic returns
         total_pnl = self.equity_curve[-1] - self.initial_capital
-        total_return = total_pnl / self.initial_capital
+        total_return_pct = total_pnl / self.initial_capital
+        
+        # Annualized return
+        num_days = len(self.dates_equity)
+        num_years = num_days / 252  # Trading days
+        annualized_return_pct = (
+            (1 + total_return_pct) ** (1 / num_years) - 1
+            if num_years > 0 else 0
+        )
         
         # Trade stats
         if len(trades_df) > 0:
@@ -194,9 +256,10 @@ class BacktestEngine:
             profit_factor = 0
             total_fees_paid = 0
         
-        # Sharpe ratio
+        # Sharpe ratio with dynamic risk-free rate
         daily_returns = np.diff(equity_arr) / equity_arr[:-1]
-        excess_returns = daily_returns - (0.02 / 252)
+        daily_rf_rate = (self.risk_free_rate if self.risk_free_rate else 0.02) / 252
+        excess_returns = daily_returns - daily_rf_rate
         sharpe = (
             (np.mean(excess_returns) / np.std(excess_returns)) * np.sqrt(252)
             if len(excess_returns) > 0 and np.std(excess_returns) > 0
@@ -208,20 +271,14 @@ class BacktestEngine:
         drawdowns = (equity_arr - running_max) / running_max
         max_drawdown = np.min(drawdowns)
         
-        # Calmar ratio
-        calmar = (
-            total_return / abs(max_drawdown)
-            if abs(max_drawdown) > 0
-            else (np.inf if total_return > 0 else 0)
-        )
-        
         return {
             'strategy_name': strategy_name,
-            'total_return_pct': total_return,
+            'total_return_pct': total_return_pct,
+            'annualized_return_pct': annualized_return_pct,
             'total_pnl': total_pnl,
             'sharpe_ratio': sharpe,
+            'risk_free_rate': self.risk_free_rate if self.risk_free_rate else 0.02,
             'max_drawdown_pct': max_drawdown,
-            'calmar_ratio': calmar,
             'win_rate': win_rate,
             'num_trades': num_trades,
             'winning_trades': winning_trades,
@@ -242,9 +299,10 @@ class BacktestEngine:
         print(f"{'─'*70}")
         print(f"Total Return:      {self.results['total_return_pct']:.1%} "
               f"({self.results['total_pnl']:,.0f}$)")
-        print(f"Sharpe Ratio:      {self.results['sharpe_ratio']:.2f}")
+        print(f"Annualized Return: {self.results['annualized_return_pct']:.1%}")
+        print(f"Sharpe Ratio:      {self.results['sharpe_ratio']:.2f} "
+              f"(RF Rate: {self.results['risk_free_rate']:.2%})")
         print(f"Max Drawdown:      {self.results['max_drawdown_pct']:.1%}")
-        print(f"Calmar Ratio:      {self.results['calmar_ratio']:.2f}")
         print(f"Win Rate:          {self.results['win_rate']:.1%} "
               f"({self.results['winning_trades']}/{self.results['num_trades']})")
         print(f"Total Fees:        ${self.results['total_fees_paid']:,.0f}")
@@ -332,10 +390,11 @@ class BacktestEngine:
                 'Export Date',
                 '',
                 'Total Return (%)',
+                'Annualized Return (%)',
                 'Total P&L ($)',
                 'Sharpe Ratio',
+                'Risk-Free Rate (10Y Treasury %)',
                 'Max Drawdown (%)',
-                'Calmar Ratio',
                 'Win Rate (%)',
                 'Number of Trades',
                 'Winning Trades',
@@ -353,10 +412,11 @@ class BacktestEngine:
                 datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 '',
                 f"{self.results.get('total_return_pct', 0):.2%}",
+                f"{self.results.get('annualized_return_pct', 0):.2%}",
                 f"{self.results.get('total_pnl', 0):,.2f}",
                 f"{self.results.get('sharpe_ratio', 0):.3f}",
+                f"{self.results.get('risk_free_rate', 0.02):.2%}",
                 f"{self.results.get('max_drawdown_pct', 0):.2%}",
-                f"{self.results.get('calmar_ratio', 0):.3f}",
                 f"{self.results.get('win_rate', 0):.2%}",
                 self.results.get('num_trades', 0),
                 self.results.get('winning_trades', 0),
