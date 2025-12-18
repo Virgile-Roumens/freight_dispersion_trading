@@ -382,9 +382,6 @@ if tab_choice == "📊 Data Overview":
             <li><b>Causality Testing</b> - Predictive power validation</li>
             <li><b>Quality Assurance</b> - Data integrity verification</li>
         </ul>
-        <p style='color: #5eb8e8; margin: 0.75rem 0 0 0; font-style: italic; font-size: 0.95rem;'>
-        💡 <b>Engelhart Principle:</b> We prioritize intellectual honesty over inflated performance claims. Robust analysis beats overfitted models.
-        </p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -421,7 +418,8 @@ if tab_choice == "📊 Data Overview":
         st.metric(
             "R² (Explained Var.)",
             f"{r_squared:.1%}",
-            delta=f"{100-r_squared*100:.0f}% unexplained"
+            delta=f"{100-r_squared*100:.0f}% unexplained",
+            delta_color="inverse"
         )
     
     st.info(
@@ -1201,16 +1199,12 @@ elif tab_choice == "⚡ Strategy & Performance":
         
         with col_tier1:
             st.metric("🟢 MEDIUM", "25%", "1.0σ ≤ |z| < 1.5σ")
-            st.caption("~10% of days")
         with col_tier2:
             st.metric("🟡 STRONG", "50%", "1.5σ ≤ |z| < 2.0σ")
-            st.caption("~5% of days")
         with col_tier3:
             st.metric("🟠 V.STRONG", "75%", "2.0σ ≤ |z| < 2.5σ")
-            st.caption("~3% of days")
         with col_tier4:
             st.metric("🔴 EXTREME", "100%", "|z| ≥ 2.5σ")
-            st.caption("~2% of days")
         
         st.markdown("---")
         
