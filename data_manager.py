@@ -31,16 +31,14 @@ class DataManager:
         data_quality_report (dict): Data quality report
     """
     
-    def __init__(self, price_csv: str, dispersion_csv: str, verbose: bool = True):
+    def __init__(self, price_csv: str, dispersion_csv: str):
         """
         Initialize DataManager and load both datasets.
         
         Args:
             price_csv: Path to cape_front_month.csv
             dispersion_csv: Path to dispersion_case_study.csv
-            verbose: Display loading logs
         """
-        self.verbose = verbose
         self.price_data = None
         self.dispersion_data = None
         self.merged_data = None
@@ -76,11 +74,6 @@ class DataManager:
                 keep='first'
             )
             self.price_data = self.price_data.sort_values('date').reset_index(drop=True)
-            
-            if self.verbose:
-                print(f"✓ 5TC prices loaded: {len(self.price_data)} rows")
-                print(f"  Period: {self.price_data['date'].min().date()} "
-                      f"to {self.price_data['date'].max().date()}")
         except Exception as e:
             print(f"✗ Error loading prices: {e}")
             self.data_quality_report['price_load_error'] = str(e)
@@ -141,13 +134,6 @@ class DataManager:
                  self.dispersion_data['vloc_vessel_count'].fillna(0)) /
                 self.dispersion_data['total_vessel_count'].replace(0, np.nan)
             )
-            
-            if self.verbose:
-                print(f"✓ Fleet dispersion loaded: {len(self.dispersion_data)} rows")
-                print(f"  Capesize: {self.dispersion_data['cape_vessel_count'].min():.0f} "
-                      f"to {self.dispersion_data['cape_vessel_count'].max():.0f} vessels")
-                print(f"  VLOC: {self.dispersion_data['vloc_vessel_count'].min():.0f} "
-                      f"to {self.dispersion_data['vloc_vessel_count'].max():.0f} vessels")
         except Exception as e:
             print(f"✗ Error loading dispersion: {e}")
             self.data_quality_report['dispersion_load_error'] = str(e)
@@ -169,9 +155,6 @@ class DataManager:
                 self.data_quality_report['rows_dropped_nan'] = missing_count
             
             self.merged_data = merged
-            
-            if self.verbose:
-                print(f"\n✓ Merge complete: {len(self.merged_data)} common rows")
         except Exception as e:
             print(f"✗ Merge error: {e}")
             self.data_quality_report['merge_error'] = str(e)
@@ -212,10 +195,6 @@ class DataManager:
             self.merged_data['avg_disp_change_5d'] = (
                 self.merged_data['avg_dispersion'].diff(5)
             )
-            
-            if self.verbose:
-                print(f"✓ Basic features added "
-                      f"(returns, dispersion changes)")
         except Exception as e:
             print(f"✗ Features error: {e}")
             self.data_quality_report['feature_error'] = str(e)
@@ -236,11 +215,7 @@ class DataManager:
         df = self.merged_data.copy()
         
         if drop_na:
-            initial_rows = len(df)
             df = df.dropna()
-            rows_dropped = initial_rows - len(df)
-            if self.verbose and rows_dropped > 0:
-                print(f"  {rows_dropped} rows with NaN removed")
         
         return df
     

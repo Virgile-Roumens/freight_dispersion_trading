@@ -81,11 +81,10 @@ def load_data_once():
     """Load data once and cache it."""
     dm = DataManager(
         price_csv='cape_front_month.csv',
-        dispersion_csv='dispersion_case_study.csv',
-        verbose=False
+        dispersion_csv='dispersion_case_study.csv'
     )
     clean_data = dm.get_clean_data(drop_na=True)
-    sg = SignalGenerator(clean_data, verbose=False)
+    sg = SignalGenerator(clean_data)
     return dm, sg, clean_data
 
 
@@ -123,10 +122,10 @@ st.sidebar.subheader("⚙️ Signal Parameters")
 signal_lag = st.sidebar.slider(
     "Signal Lag (days)",
     min_value=0,
-    max_value=5,
+    max_value=14,
     value=0,
     step=1,
-    help="Wait N days after signal before entering position (0 = immediate)"
+    help="Wait N days after signal before entering position (0 = immediate). Test if dispersion momentum leads prices by several days."
 )
 
 st.sidebar.markdown("---")
@@ -158,7 +157,7 @@ try:
     data_summary = dm.get_data_summary()
     
     # Generate signals with user-selected lag
-    sg = SignalGenerator(clean_data, signal_lag=signal_lag, verbose=False)
+    sg = SignalGenerator(clean_data, signal_lag=signal_lag)
     signals_df = sg.get_signals_dataframe()
 except Exception as e:
     st.error(f"❌ Error loading data: {e}")
@@ -502,7 +501,7 @@ if tab_choice == "📊 Data Overview":
         
         with st.spinner("Running Granger causality tests..."):
             # Test: Does dispersion Granger-cause price?
-            gc_results = grangercausalitytests(test_data[['price_5tc', 'avg_dispersion']], max_lag, verbose=False)
+            gc_results = grangercausalitytests(test_data[['price_5tc', 'avg_dispersion']], max_lag)
         
         # Extract p-values
         results_list = []
@@ -847,8 +846,7 @@ elif tab_choice == "🏬 Backtest Results":
         engine = BacktestEngine(
             signals_df,
             initial_capital=initial_capital,
-            transaction_fee_bps=fee_bps,
-            verbose=False
+            transaction_fee_bps=fee_bps
         )
         results = engine.backtest_strategy(signal_col, strategy_choice)
     
@@ -1160,14 +1158,13 @@ elif tab_choice == "📈 Economic Analysis":
         lag_results = []
         
         for test_lag in range(0, 6):
-            sg_test = SignalGenerator(clean_data, signal_lag=test_lag, verbose=False)
+            sg_test = SignalGenerator(clean_data, signal_lag=test_lag)
             signals_test = sg_test.get_signals_dataframe()
             
             engine_test = BacktestEngine(
                 signals_test,
                 initial_capital=initial_capital,
-                transaction_fee_bps=fee_bps,
-                verbose=False
+                transaction_fee_bps=fee_bps
             )
             results_test = engine_test.backtest_strategy('signal_momentum', f'Momentum_Lag{test_lag}')
             

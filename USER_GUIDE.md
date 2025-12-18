@@ -164,14 +164,13 @@ from backtest_engine import BacktestEngine
 # 1. Load and clean the data
 dm = DataManager(
     price_csv='cape_front_month.csv',
-    dispersion_csv='dispersion_case_study.csv',
-    verbose=True  # Display logs
+    dispersion_csv='dispersion_case_study.csv'
 )
 clean_data = dm.get_clean_data(drop_na=True)
 summary = dm.get_data_summary()
 
 # 2. Generate signals
-sg = SignalGenerator(clean_data, verbose=True)
+sg = SignalGenerator(clean_data)
 signals_df = sg.get_signals_dataframe()
 signal_stats = sg.get_signal_statistics()
 
@@ -179,9 +178,7 @@ signal_stats = sg.get_signal_statistics()
 engine = BacktestEngine(
     data_with_signals=signals_df,
     initial_capital=1_000_000,
-    transaction_fee_bps=10,
-    max_drawdown_stop=0.02,  # 2%
-    verbose=True
+    transaction_fee_bps=10
 )
 results = engine.backtest_strategy('signal_momentum', 'Momentum')
 

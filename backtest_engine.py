@@ -33,8 +33,7 @@ class BacktestEngine:
         self,
         data_with_signals: pd.DataFrame,
         initial_capital: float = 1_000_000,
-        transaction_fee_bps: float = 10,
-        verbose: bool = True
+        transaction_fee_bps: float = 10
     ):
         """
         Initialize BacktestEngine.
@@ -43,12 +42,10 @@ class BacktestEngine:
             data_with_signals: DataFrame with signals from SignalGenerator
             initial_capital: Initial capital in USD
             transaction_fee_bps: Fees per trade in basis points
-            verbose: Display logs
         """
         self.data = data_with_signals.copy()
         self.initial_capital = initial_capital
         self.fee_bps = transaction_fee_bps / 10000  # Convert to decimal
-        self.verbose = verbose
         
         # Store results
         self.results = {}
@@ -80,13 +77,6 @@ class BacktestEngine:
         entry_price = None
         entry_date = None
         capital = self.initial_capital
-        
-        if self.verbose:
-            print(f"\n{'='*70}")
-            print(f"BACKTEST: {strategy_name}")
-            print(f"{'='*70}")
-            print(f"Capital: ${self.initial_capital:,.0f}")
-            print(f"Fees: {self.fee_bps*10000:.1f} bps")
         
         # Loop over each day
         for i in range(len(self.data)):
@@ -169,9 +159,6 @@ class BacktestEngine:
         
         # Calculate metrics
         self.results = self._compute_metrics(strategy_name)
-        
-        if self.verbose:
-            self._print_results(strategy_name)
         
         return self.results
     

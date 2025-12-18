@@ -27,19 +27,17 @@ class SignalGenerator:
         signal_explanations (dict): Economic explanations of signals
     """
     
-    def __init__(self, clean_data: pd.DataFrame, signal_lag: int = 0, verbose: bool = True):
+    def __init__(self, clean_data: pd.DataFrame, signal_lag: int = 0):
         """
         Initialize SignalGenerator.
         
         Args:
             clean_data: Output from DataManager.get_clean_data()
-            signal_lag: Number of days to wait before acting on signal (0-5)
-            verbose: Display logs
+            signal_lag: Number of days to wait before acting on signal (0-14)
         """
         self.data = clean_data.copy()
         self.features = None
         self.signal_lag = signal_lag
-        self.verbose = verbose
         
         # Position sizing thresholds (based on momentum z-score)
         # MULTI-THRESHOLD APPROACH: Graduated conviction levels
@@ -151,9 +149,6 @@ class SignalGenerator:
                 (self.features['avg_disp_change_5d'] - disp_change_mean) / 
                 disp_change_std
             )
-            
-            if self.verbose:
-                print("✓ Features calculated (z-scores, quartiles, momentum)")
         except Exception as e:
             print(f"✗ Error computing features: {e}")
             raise
@@ -243,39 +238,6 @@ class SignalGenerator:
             
             self.features['signal_momentum_strength'] = strength
             self.features['signal_momentum_size'] = np.abs(persistent_signal)
-            
-            if self.verbose:
-                lag_msg = f" with {self.signal_lag}-day lag" if self.signal_lag > 0 else ""
-                # Count signals after all filters
-                final_signals = persistent_signal
-                filtered_by_volatility = volatility_filter.sum()
-                filtered_by_regime = low_vol_regime.sum()
-                
-                # Count by threshold before persistence filter
-                extreme_count_raw = (strength >= self.extreme_threshold).sum()
-                very_strong_count_raw = ((strength >= self.very_strong_threshold) & (strength < self.extreme_threshold)).sum()
-                strong_count_raw = ((strength >= self.strong_threshold) & (strength < self.very_strong_threshold)).sum()
-                medium_count_raw = ((strength >= self.medium_threshold) & (strength < self.strong_threshold)).sum()
-                
-                # Count final signals after all filters
-                extreme_count = (np.abs(final_signals) == 1.00).sum()
-                very_strong_count = (np.abs(final_signals) == 0.75).sum()
-                strong_count = (np.abs(final_signals) == 0.50).sum()
-                medium_count = (np.abs(final_signals) == 0.25).sum()
-                flat_count = (final_signals == 0).sum()
-                total_active = extreme_count + very_strong_count + strong_count + medium_count
-                
-                print(f"✓ Signal generated (MULTI-THRESHOLD{lag_msg})")
-                print(f"  Graduated position sizing: |z| ≥ {self.medium_threshold}σ minimum")
-                print(f"  Protective filters applied:")
-                print(f"    - Multi-threshold: {extreme_count_raw} extreme, {very_strong_count_raw} very strong, {strong_count_raw} strong, {medium_count_raw} medium detected")
-                print(f"    - Volatility filter: {filtered_by_volatility} days blocked (|price_z| > {self.volatility_threshold}σ)")
-                print(f"    - Regime detection: {filtered_by_regime} days blocked (low-vol regime)")
-                print(f"    - Signal persistence: {self.persistence_days} consecutive days required")
-                print(f"  Final signals after all filters:")
-                print(f"    - {extreme_count} EXTREME (100%), {very_strong_count} VERY STRONG (75%), {strong_count} STRONG (50%), {medium_count} MEDIUM (25%)")
-                print(f"    - {flat_count} FLAT (0%)")
-                print(f"  Trading frequency: {total_active}/{len(final_signals)} = {100*total_active/len(final_signals):.1f}% of days")
         except Exception as e:
             print(f"✗ Error generating signals: {e}")
             raise
