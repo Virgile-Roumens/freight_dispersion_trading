@@ -13,6 +13,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Tuple, List
 from datetime import datetime
+from pathlib import Path
 
 
 class BacktestEngine:
@@ -33,7 +34,6 @@ class BacktestEngine:
         data_with_signals: pd.DataFrame,
         initial_capital: float = 1_000_000,
         transaction_fee_bps: float = 10,
-        max_drawdown_stop: float = 0.02,
         verbose: bool = True
     ):
         """
@@ -43,13 +43,11 @@ class BacktestEngine:
             data_with_signals: DataFrame with signals from SignalGenerator
             initial_capital: Initial capital in USD
             transaction_fee_bps: Fees per trade in basis points
-            max_drawdown_stop: Hard stop if drawdown > this %, 0 to disable
             verbose: Display logs
         """
         self.data = data_with_signals.copy()
         self.initial_capital = initial_capital
         self.fee_bps = transaction_fee_bps / 10000  # Convert to decimal
-        self.max_dd_stop = max_drawdown_stop
         self.verbose = verbose
         
         # Store results
@@ -100,22 +98,28 @@ class BacktestEngine:
             # Check if rebalancing necessary
             should_rebalance = False
             
-            if new_signal != position:
-                should_rebalance = True
+            # Rebalance if signal changes (accounting for fractional signals)
+            current_signal_direction = np.sign(position)
+            new_signal_direction = np.sign(new_signal)
             
-            # Hard stop if drawdown exceeded
-            if position != 0 and entry_price is not None and self.max_dd_stop > 0:
-                unrealized_pnl = position * (current_price - entry_price)
-                unrealized_pct = unrealized_pnl / (entry_price * abs(position))
-                if unrealized_pct < -self.max_dd_stop:
+            # Rebalance if: direction changes OR position size changes
+            if current_signal_direction != new_signal_direction:
+                should_rebalance = True
+            elif position != 0 and new_signal != 0:
+                # Check if position size changed significantly (more than 5%)
+                current_size = abs(position * entry_price / capital) if capital > 0 else 0
+                target_size = abs(new_signal)
+                if abs(current_size - target_size) > 0.05:
                     should_rebalance = True
             
             # REBALANCE
             if should_rebalance:
                 # Close previous position
                 if position != 0 and entry_price is not None:
+                    # Calculate notional value at exit
+                    position_value = abs(position) * entry_price
                     exit_pnl = position * (current_price - entry_price)
-                    fee_exit = abs(position) * current_price * self.fee_bps
+                    fee_exit = position_value * self.fee_bps
                     net_pnl = exit_pnl - fee_exit
                     capital += net_pnl
                     
@@ -129,24 +133,38 @@ class BacktestEngine:
                         'gross_pnl': exit_pnl,
                         'fee_cost': fee_exit,
                         'net_pnl': net_pnl,
-                        'return_pct': exit_pnl / (entry_price * abs(position)),
+                        'return_pct': exit_pnl / position_value,
                         'days_held': (current_date - entry_date).days,
                     })
                 
-                # Open new position
+                # Open new position - size based on signal strength and current capital
                 if new_signal != 0:
                     entry_price = current_price
                     entry_date = current_date
-                    fee_entry = abs(new_signal) * current_price * self.fee_bps
+                    # Signal contains both direction (sign) and size (magnitude)
+                    # new_signal ranges from -1.0 to +1.0
+                    signal_direction = np.sign(new_signal)
+                    signal_size = abs(new_signal)  # 0.25, 0.50, or 1.00
+                    
+                    # Fees based on intended position size
+                    intended_capital = capital * signal_size
+                    fee_entry = intended_capital * self.fee_bps
+                    investable_capital = intended_capital - fee_entry
+                    
+                    # Position size = (investable capital × signal_size) / price
+                    position = signal_direction * (investable_capital / current_price)
                     capital -= fee_entry
-                    position = new_signal
                 else:
                     position = 0
                     entry_price = None
                     entry_date = None
             
-            # Record daily equity
-            self.equity_curve.append(capital)
+            # Record daily equity (mark-to-market if position open)
+            if position != 0 and entry_price is not None:
+                mtm_value = capital + position * (current_price - entry_price)
+                self.equity_curve.append(mtm_value)
+            else:
+                self.equity_curve.append(capital)
             self.dates_equity.append(current_date)
         
         # Calculate metrics
@@ -263,11 +281,17 @@ class BacktestEngine:
         fee_levels: List[float]
     ) -> pd.DataFrame:
         """Analyze sensitivity to different fee levels."""
+        # Save original state to restore after sensitivity analysis
+        original_fee = self.fee_bps
+        original_results = self.results.copy() if self.results else {}
+        original_trade_log = self.trade_log.copy()
+        original_equity_curve = self.equity_curve.copy()
+        original_dates_equity = self.dates_equity.copy()
+        
         results_list = []
         
         for fee_bps in fee_levels:
-            # Save current fees
-            original_fee = self.fee_bps
+            # Set new fee level
             self.fee_bps = fee_bps / 10000
             
             # Run backtest
@@ -281,8 +305,129 @@ class BacktestEngine:
                 'Win Rate': f"{results['win_rate']:.1%}",
                 'Total Fees': f"${results['total_fees_paid']:,.0f}",
             })
-            
-            # Restore fees
-            self.fee_bps = original_fee
+        
+        # Restore original state
+        self.fee_bps = original_fee
+        self.results = original_results
+        self.trade_log = original_trade_log
+        self.equity_curve = original_equity_curve
+        self.dates_equity = original_dates_equity
         
         return pd.DataFrame(results_list)
+    
+    def export_results(
+        self,
+        filepath: str,
+        signal_lag: int = 0,
+        file_format: str = 'xlsx'
+    ) -> None:
+        """
+        Export backtest results to Excel or CSV.
+        
+        Args:
+            filepath: Path to save file (without extension)
+            signal_lag: Signal lag used in backtest
+            file_format: 'xlsx' or 'csv'
+        """
+        from pathlib import Path
+        
+        # Create export directory if it doesn't exist
+        export_dir = Path(filepath).parent
+        export_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Prepare metadata
+        metadata = {
+            'Parameter': [
+                'Strategy Name',
+                'Initial Capital ($)',
+                'Transaction Fees (bps)',
+                'Signal Lag (days)',
+                'Export Date',
+                '',
+                'Total Return (%)',
+                'Total P&L ($)',
+                'Sharpe Ratio',
+                'Max Drawdown (%)',
+                'Calmar Ratio',
+                'Win Rate (%)',
+                'Number of Trades',
+                'Winning Trades',
+                'Losing Trades',
+                'Average Win ($)',
+                'Average Loss ($)',
+                'Profit Factor',
+                'Total Fees Paid ($)'
+            ],
+            'Value': [
+                self.results.get('strategy_name', 'N/A'),
+                f"{self.initial_capital:,.0f}",
+                f"{self.fee_bps * 10000:.1f}",
+                signal_lag,
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                '',
+                f"{self.results.get('total_return_pct', 0):.2%}",
+                f"{self.results.get('total_pnl', 0):,.2f}",
+                f"{self.results.get('sharpe_ratio', 0):.3f}",
+                f"{self.results.get('max_drawdown_pct', 0):.2%}",
+                f"{self.results.get('calmar_ratio', 0):.3f}",
+                f"{self.results.get('win_rate', 0):.2%}",
+                self.results.get('num_trades', 0),
+                self.results.get('winning_trades', 0),
+                self.results.get('losing_trades', 0),
+                f"{self.results.get('avg_win', 0):,.2f}",
+                f"{self.results.get('avg_loss', 0):,.2f}",
+                f"{self.results.get('profit_factor', 0):.3f}",
+                f"{self.results.get('total_fees_paid', 0):,.2f}"
+            ]
+        }
+        metadata_df = pd.DataFrame(metadata)
+        
+        # Prepare trade log
+        trades_df = self.get_trade_log()
+        if not trades_df.empty:
+            # Format dates
+            trades_df['entry_date'] = pd.to_datetime(trades_df['entry_date']).dt.strftime('%Y-%m-%d')
+            trades_df['exit_date'] = pd.to_datetime(trades_df['exit_date']).dt.strftime('%Y-%m-%d')
+            # Format numbers
+            trades_df['entry_price'] = trades_df['entry_price'].round(2)
+            trades_df['exit_price'] = trades_df['exit_price'].round(2)
+            trades_df['gross_pnl'] = trades_df['gross_pnl'].round(2)
+            trades_df['fee_cost'] = trades_df['fee_cost'].round(2)
+            trades_df['net_pnl'] = trades_df['net_pnl'].round(2)
+            trades_df['return_pct'] = (trades_df['return_pct'] * 100).round(2)
+            
+            # Rename columns for clarity
+            trades_df = trades_df.rename(columns={
+                'entry_date': 'Entry Date',
+                'exit_date': 'Exit Date',
+                'entry_price': 'Entry Price ($)',
+                'exit_price': 'Exit Price ($)',
+                'direction': 'Direction',
+                'size': 'Size (units)',
+                'gross_pnl': 'Gross P&L ($)',
+                'fee_cost': 'Fees ($)',
+                'net_pnl': 'Net P&L ($)',
+                'return_pct': 'Return (%)',
+                'days_held': 'Days Held'
+            })
+        
+        # Prepare equity curve
+        equity_df = pd.DataFrame({
+            'Date': [d.strftime('%Y-%m-%d') for d in self.dates_equity],
+            'Equity ($)': [round(e, 2) for e in self.equity_curve]
+        })
+        
+        # Export based on format
+        if file_format.lower() == 'xlsx':
+            filepath_full = f"{filepath}.xlsx"
+            with pd.ExcelWriter(filepath_full, engine='openpyxl') as writer:
+                metadata_df.to_excel(writer, sheet_name='Summary', index=False)
+                if not trades_df.empty:
+                    trades_df.to_excel(writer, sheet_name='Trade Log', index=False)
+                equity_df.to_excel(writer, sheet_name='Equity Curve', index=False)
+        else:  # CSV
+            # For CSV, save as separate files
+            metadata_df.to_csv(f"{filepath}_summary.csv", index=False)
+            if not trades_df.empty:
+                trades_df.to_csv(f"{filepath}_trades.csv", index=False)
+            equity_df.to_csv(f"{filepath}_equity.csv", index=False)

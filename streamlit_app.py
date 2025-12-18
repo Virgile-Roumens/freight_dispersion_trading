@@ -2,11 +2,10 @@
 Streamlit Dashboard - User-Friendly Interface for Dispersion Analysis
 
 Tabs:
-1. 📊 Data Overview - Correlations, quality
-2. 🎯 Signal Explorer - Economic explanations
+1. 📊 Data Overview - Correlations, quality, statistical tests
+2. 🎯 Signal Explorer - Momentum signal explanation
 3. 🏬 Backtest Results - Performance, P&L
 4. 📈 Economic Analysis - In-depth statistics
-5. ⚔️ Strategy Comparison - Momentum vs Regime
 
 UX Architecture:
 - Lots of st.info() for explanations
@@ -101,7 +100,7 @@ st.sidebar.info(
     "**📖 About:**\n\n"
     "This project tests whether Capesize/VLOC vessel dispersion "
     "predicts 5TC front-month prices.\n\n"
-    "✅ **Approach**: Simple statistics, no complex ML\n"
+    "✅ **Approach**: Momentum-based signal from dispersion changes\n"
     "✅ **Honest**: Acknowledges limitations\n"
     "✅ **Realistic**: Includes transaction fees"
 )
@@ -114,9 +113,20 @@ tab_choice = st.sidebar.radio(
         "📊 Data Overview",
         "🎯 Signal Explorer",
         "🏬 Backtest Results",
-        "📈 Economic Analysis",
-        "⚔️ Strategy Comparison"
+        "📈 Economic Analysis"
     ]
+)
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("⚙️ Signal Parameters")
+
+signal_lag = st.sidebar.slider(
+    "Signal Lag (days)",
+    min_value=0,
+    max_value=5,
+    value=0,
+    step=1,
+    help="Wait N days after signal before entering position (0 = immediate)"
 )
 
 st.sidebar.markdown("---")
@@ -139,22 +149,16 @@ fee_bps = st.sidebar.slider(
     help="Basis points per trade (round-trip)"
 )
 
-max_dd_stop = st.sidebar.slider(
-    "Hard Stop (% loss)",
-    min_value=0.0,
-    max_value=5.0,
-    value=2.0,
-    step=0.5,
-    help="Exit if drawdown exceeds this %"
-)
-
 # ============================================================================
 # DATA LOADING
 # ============================================================================
 
 try:
-    dm, sg, clean_data = load_data_once()
+    dm, _, clean_data = load_data_once()
     data_summary = dm.get_data_summary()
+    
+    # Generate signals with user-selected lag
+    sg = SignalGenerator(clean_data, signal_lag=signal_lag, verbose=False)
     signals_df = sg.get_signals_dataframe()
 except Exception as e:
     st.error(f"❌ Error loading data: {e}")
@@ -641,85 +645,135 @@ if tab_choice == "📊 Data Overview":
 # ============================================================================
 
 elif tab_choice == "🎯 Signal Explorer":
-    st.title("🎯 Signal Explorer: The 2 Strategies")
+    st.title("🎯 Signal Explorer: Momentum Strategy")
     
     st.info(
-        "**Step 2: Understand the signals**\n\n"
-        "We have created 2 simple signals based on dispersion:\n"
-        "1. **Momentum**: Captures short-term changes\n"
-        "2. **Regime**: Captures structural market state\n\n"
-        "Neither is \"optimal\" - they are just two different approaches."
+        "**Step 2: Understand the signal**\n\n"
+        "We use a simple momentum-based signal derived from dispersion changes:\n"
+        "- **LONG** when dispersion increases (vessels spreading out)\n"
+        "- **SHORT** when dispersion decreases (vessels concentrating)\n\n"
+        "This captures short-term vessel positioning dynamics that may precede price movements."
     )
+    
+    # Signal lag info
+    if signal_lag > 0:
+        st.warning(
+            f"⏱️ **Signal Lag Applied: {signal_lag} day(s)**\n\n"
+            f"Signal from day T is used to enter position on day T+{signal_lag}. "
+            f"This allows confirmation time and tests if dispersion changes are truly predictive."
+        )
     
     st.markdown("---")
     
-    # Explications des signaux
+    # Signal explanation
     explanations = sg.get_all_explanations()
+    exp = explanations['momentum']
     
-    signal_tabs = st.tabs(["📈 Momentum Signal", "🎯 Regime Signal"])
+    st.subheader("📈 Momentum Dispersion Signal")
     
-    with signal_tabs[0]:
-        st.subheader("📈 Momentum Dispersion Signal")
-        
-        exp = explanations['momentum']
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"**Type**: {exp['signal_type']}")
-            st.markdown(f"**Horizon**: {exp['horizon']}")
-        with col2:
-            st.markdown(f"**Logic**:")
-            st.code(exp['logic'])
-        
-        st.markdown("---")
-        st.info(f"**📖 Economic Meaning**:\n\n{exp['economic_meaning']}")
-        st.success(f"**💡 Rationale**:\n\n{exp['rationale']}")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"**Type**: {exp['signal_type']}")
+        st.markdown(f"**Horizon**: {exp['horizon']}")
+    with col2:
+        st.markdown(f"**Logic**:")
+        st.code(exp['logic'])
     
-    with signal_tabs[1]:
-        st.subheader("🎯 Regime Signal (Quartiles)")
+    st.markdown("---")
+    st.info(f"**📖 Economic Meaning**:\n\n{exp['economic_meaning']}")
+    st.success(f"**💡 Rationale**:\n\n{exp['rationale']}")
+    
+    st.markdown("---")
+    
+    # Position sizing explanation
+    st.subheader("🛡️ Multi-Threshold Strategy (Graduated Conviction)")
+    
+    st.warning(
+        "**⚠️ ADAPTED STRATEGY BASED ON EVALUATION ⚠️**\n\n"
+        "Based on comprehensive analysis showing weak correlation (r=0.27), this strategy uses "
+        "**graduated position sizing** to balance signal capture with risk management.\n\n"
+        "**Key Finding:** More aggressive than extreme-only approach, but still filters weak signals (|z|<1.0). "
+        "Combine with other indicators for best results."
+    )
+    
+    st.info(
+        "**Multi-Threshold Position Sizing:**\n\n"
+        "**Position Allocation by Signal Strength:**\n"
+        "- 🔴 **EXTREME** (|z| ≥ 2.5σ) → **100% allocation** (very rare, ~2% of days)\n"
+        "- 🟠 **VERY STRONG** (2.0σ ≤ |z| < 2.5σ) → **75% allocation** (rare, ~3% of days)\n"
+        "- 🟡 **STRONG** (1.5σ ≤ |z| < 2.0σ) → **50% allocation** (uncommon, ~5% of days)\n"
+        "- 🟢 **MEDIUM** (1.0σ ≤ |z| < 1.5σ) → **25% allocation** (occasional, ~10% of days)\n"
+        "- ⚪ **WEAK** (|z| < 1.0σ) → **0% allocation - FLAT** (filtered out, ~80% of days)\n\n"
+        "**Protective Filters:**\n\n"
+        "**1️⃣ Signal Persistence**\n"
+        "- Requires **2 consecutive days** of same signal direction\n"
+        "- Filters out 1-day spikes and random noise\n\n"
+        "**2️⃣ Regime Detection**\n"
+        "- Avoids trading in low-volatility regimes (90-day rolling average)\n"
+        "- Addresses non-stationarity risk\n\n"
+        "**3️⃣ Volatility Filter**\n"
+        "- Blocks trading when |price z-score| > 2.0σ (extreme market volatility)\n\n"
+        "**Result:** ~15-25% of days have active positions, graduated by conviction level. "
+        "Higher signal capture than extreme-only, lower than aggressive approaches."
+    )
+    
+    # Show position size distribution
+    if 'signal_momentum_size' in signals_df.columns:
+        size_dist = signals_df['signal_momentum_size'].value_counts().sort_index()
         
-        exp = explanations['regime']
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"**Type**: {exp['signal_type']}")
-            st.markdown(f"**Horizon**: {exp['horizon']}")
-        with col2:
-            st.markdown(f"**Logic**:")
-            st.code(exp['logic'])
-        
-        st.markdown("---")
-        st.info(f"**📖 Economic Meaning**:\n\n{exp['economic_meaning']}")
-        st.success(f"**💡 Rationale**:\n\n{exp['rationale']}")
+        col_size1, col_size2, col_size3, col_size4, col_size5 = st.columns(5)
+        with col_size1:
+            extreme_count = (signals_df['signal_momentum_size'] == 1.0).sum()
+            extreme_pct = 100 * extreme_count / len(signals_df)
+            st.metric("🔴 EXTREME", f"{extreme_count:,}", f"100% ({extreme_pct:.1f}%)")
+        with col_size2:
+            very_strong_count = (signals_df['signal_momentum_size'] == 0.75).sum()
+            very_strong_pct = 100 * very_strong_count / len(signals_df)
+            st.metric("🟠 VERY STRONG", f"{very_strong_count:,}", f"75% ({very_strong_pct:.1f}%)")
+        with col_size3:
+            strong_count = (signals_df['signal_momentum_size'] == 0.50).sum()
+            strong_pct = 100 * strong_count / len(signals_df)
+            st.metric("🟡 STRONG", f"{strong_count:,}", f"50% ({strong_pct:.1f}%)")
+        with col_size4:
+            medium_count = (signals_df['signal_momentum_size'] == 0.25).sum()
+            medium_pct = 100 * medium_count / len(signals_df)
+            st.metric("🟢 MEDIUM", f"{medium_count:,}", f"25% ({medium_pct:.1f}%)")
+        with col_size5:
+            flat_count = (signals_df['signal_momentum'] == 0).sum()
+            flat_pct = 100 * flat_count / len(signals_df)
+            st.metric("⚪ FLAT", f"{flat_count:,}", f"0% ({flat_pct:.1f}%)")
     
     st.markdown("---")
     
     # Signal statistics
-    st.subheader("📊 Signal Statistics (Historical)")
+    st.subheader("📊 Signal Performance (Historical)")
     
     signal_stats = sg.get_signal_statistics()
-    stats_df_list = []
     
-    for signal_name, stats in signal_stats.items():
-        clean_name = signal_name.replace('signal_', '').upper()
-        stats_df_list.append({
-            'Signal': clean_name,
-            'Days LONG': f"{stats.get('long_signals', 0):.0f}",
-            'Days SHORT': f"{stats.get('short_signals', 0):.0f}",
-            'Days FLAT': f"{stats.get('flat_signals', 0):.0f}",
-            'Avg Return LONG': f"{stats.get('avg_return_on_long', 0):.2%}",
-            'Avg Return SHORT': f"{stats.get('avg_return_on_short', 0):.2%}",
-            'Win Rate LONG': f"{stats.get('win_rate_long', 0):.1%}",
-        })
-    
-    stats_display_df = pd.DataFrame(stats_df_list)
-    st.dataframe(stats_display_df, use_container_width=True, hide_index=True)
+    if 'signal_momentum' in signal_stats:
+        stats = signal_stats['signal_momentum']
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Days LONG", f"{stats.get('long_signals', 0):.0f}")
+            st.metric("Avg Return LONG", f"{stats.get('avg_return_on_long', 0):.2%}")
+        with col2:
+            st.metric("Days SHORT", f"{stats.get('short_signals', 0):.0f}")
+            st.metric("Avg Return SHORT", f"{stats.get('avg_return_on_short', 0):.2%}")
+        with col3:
+            st.metric("Days FLAT", f"{stats.get('flat_signals', 0):.0f}")
+            st.metric("Win Rate LONG", f"{stats.get('win_rate_long', 0):.1%}")
+        with col4:
+            total_days = stats.get('total_signals', 0)
+            active_pct = (stats.get('long_signals', 0) + stats.get('short_signals', 0)) / total_days if total_days > 0 else 0
+            st.metric("Total Days", f"{total_days:.0f}")
+            st.metric("Active %", f"{active_pct:.1%}")
     
     st.info(
-        "**How to read this table:**\n\n"
-        "- **Days LONG/SHORT/FLAT**: Number of days in each position\n"
-        "- **Avg Return**: Average 5-day return when signal is active\n"
-        "- **Win Rate**: % of days where the signal predicted the right direction"
+        "**Interpretation:**\n\n"
+        "- **Active %**: Percentage of time the signal is LONG or SHORT (not FLAT)\n"
+        "- **Avg Return**: Average 5-day forward return when signal is active\n"
+        "- **Win Rate LONG**: % of LONG signals that were profitable"
     )
     
     st.markdown("---")
@@ -734,19 +788,20 @@ elif tab_choice == "🎯 Signal Explorer":
     latest_signals['return_5d'] = latest_signals['return_5d'].apply(lambda x: f"{x:+.2%}")
     
     def signal_emoji(val):
-        if val == 1:
-            return "🟢 LONG"
-        elif val == -1:
-            return "🔴 SHORT"
+        if val > 0:
+            size_pct = int(val * 100)
+            return f"🟢 LONG ({size_pct}%)"
+        elif val < 0:
+            size_pct = int(abs(val) * 100)
+            return f"🔴 SHORT ({size_pct}%)"
         else:
-            return "⚪ FLAT"
+            return "⚪ FLAT (0%)"
     
-    latest_signals['Momentum'] = latest_signals['signal_momentum'].apply(signal_emoji)
-    latest_signals['Regime'] = latest_signals['signal_regime'].apply(signal_emoji)
+    latest_signals['Signal'] = latest_signals['signal_momentum'].apply(signal_emoji)
     
     display_cols = [
         'date', 'price_5tc', 'avg_dispersion', 'disp_quartile',
-        'Momentum', 'Regime', 'return_5d'
+        'Signal', 'return_5d'
     ]
     
     st.dataframe(
@@ -763,33 +818,36 @@ elif tab_choice == "🎯 Signal Explorer":
 elif tab_choice == "🏬 Backtest Results":
     st.title("🏬 Backtest Results & Performance")
     
+    st.warning(
+        "**⚠️ MULTI-THRESHOLD STRATEGY ⚠️**\n\n"
+        "This strategy uses **graduated position sizing** based on signal strength:\n"
+        "- Stronger signals (higher |z-score|) receive larger allocations\n"
+        "- More aggressive than extreme-only, but still filters weak signals\n"
+        "- Trades ~15-25% of days vs ~5% with extreme-only or ~60% with old approach\n\n"
+        "**Combine with other indicators** for best results."
+    )
+    
     st.info(
-        "**Step 3: Evaluate performance**\n\n"
-        f"Backtest configuration:\n"
+        f"**Backtest configuration:**\n"
         f"- 💰 Initial Capital: ${initial_capital:,}\n"
         f"- 💸 Fees: {fee_bps} bps per trade\n"
-        f"- 🛑 Hard Stop: {max_dd_stop:.1f}%\n\n"
-        "We simulate daily trading with automatic rebalancing."
+        f"- 🎯 Position Sizing: 25% (|z|≥1.0), 50% (|z|≥1.5), 75% (|z|≥2.0), 100% (|z|≥2.5)\n"
+        f"- 🛡️ Persistence: 2 consecutive days\n"
+        f"- 📊 Regime Detection: Enabled (90-day lookback)\n\n"
+        "Results reflect the multi-threshold graduated conviction strategy."
     )
     
     st.markdown("---")
     
-    # Strategy selection
-    strategy_choice = st.radio(
-        "Choose the strategy to backtest",
-        ["Momentum", "Regime"],
-        horizontal=True
-    )
+    # Run backtest
+    signal_col = 'signal_momentum'
+    strategy_choice = 'Momentum'
     
-    signal_col = 'signal_momentum' if strategy_choice == 'Momentum' else 'signal_regime'
-    
-    # Lancer backtest
-    with st.spinner(f"Backtesting {strategy_choice}..."):
+    with st.spinner("Running backtest..."):
         engine = BacktestEngine(
             signals_df,
             initial_capital=initial_capital,
             transaction_fee_bps=fee_bps,
-            max_drawdown_stop=max_dd_stop / 100,
             verbose=False
         )
         results = engine.backtest_strategy(signal_col, strategy_choice)
@@ -907,8 +965,72 @@ elif tab_choice == "🏬 Backtest Results":
         display_log['return_pct'] = display_log['return_pct'].apply(lambda x: f"{x:+.2%}")
         
         st.dataframe(display_log, use_container_width=True, hide_index=True)
+        
+        st.info(f"Showing last 20 trades. Total trades: {len(trade_log)}")
     else:
         st.info("No trades executed for this signal.")
+    
+    st.markdown("---")
+    
+    # Export functionality
+    st.subheader("💾 Export Backtest Results")
+    
+    st.info(
+        "**Export Options:**\n\n"
+        "Download complete backtest results including:\n"
+        "- Summary with all parameters (lag, capital, fees)\n"
+        "- Complete trade log with all trades\n"
+        "- Equity curve data\n\n"
+        "Choose format: **Excel** (single file, multiple sheets) or **CSV** (separate files)"
+    )
+    
+    col_export1, col_export2, col_export3 = st.columns([2, 1, 1])
+    
+    with col_export1:
+        export_filename = st.text_input(
+            "Filename (without extension)",
+            value=f"backtest_lag{signal_lag}_capital{initial_capital//1000}k_fees{fee_bps}bps_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            help="Customize the export filename"
+        )
+    
+    with col_export2:
+        export_format = st.selectbox(
+            "Format",
+            options=["xlsx", "csv"],
+            help="Excel = single file with multiple sheets, CSV = separate files"
+        )
+    
+    with col_export3:
+        st.write("")  # Spacing
+        st.write("")  # Spacing
+        if st.button("📥 Export Results", type="primary", use_container_width=True):
+            try:
+                # Prepare export path
+                export_path = Path("export") / export_filename
+                
+                # Export using BacktestEngine method
+                engine.export_results(
+                    filepath=str(export_path),
+                    signal_lag=signal_lag,
+                    file_format=export_format
+                )
+                
+                if export_format == 'xlsx':
+                    st.success(f"✅ Results exported to: `export/{export_filename}.xlsx`")
+                else:
+                    st.success(
+                        f"✅ Results exported to:\n"
+                        f"- `export/{export_filename}_summary.csv`\n"
+                        f"- `export/{export_filename}_trades.csv`\n"
+                        f"- `export/{export_filename}_equity.csv`"
+                    )
+                
+                st.info(
+                    "📁 **Files saved in `export/` folder**\n\n"
+                    "The export folder is gitignored to keep your results private."
+                )
+            except Exception as e:
+                st.error(f"❌ Export failed: {e}")
 
 
 # ============================================================================
@@ -1022,8 +1144,105 @@ elif tab_choice == "📈 Economic Analysis":
     
     st.markdown("---")
     
+    # Lag Sensitivity Analysis
+    st.subheader("4️⃣ Signal Lag Sensitivity Analysis")
+    
+    st.info(
+        "**Question**: Is it better to act immediately on the signal, or wait 1-3 days?\n\n"
+        "If dispersion is truly *predictive*, a lag might improve performance by:\n"
+        "- Filtering out noise and false signals\n"
+        "- Capturing only persistent dispersion shifts\n"
+        "- Allowing confirmation time before entering positions\n\n"
+        f"**Current setting**: {signal_lag}-day lag"
+    )
+    
+    with st.spinner("Testing different lags..."):
+        lag_results = []
+        
+        for test_lag in range(0, 6):
+            sg_test = SignalGenerator(clean_data, signal_lag=test_lag, verbose=False)
+            signals_test = sg_test.get_signals_dataframe()
+            
+            engine_test = BacktestEngine(
+                signals_test,
+                initial_capital=initial_capital,
+                transaction_fee_bps=fee_bps,
+                verbose=False
+            )
+            results_test = engine_test.backtest_strategy('signal_momentum', f'Momentum_Lag{test_lag}')
+            
+            lag_results.append({
+                'Lag (days)': test_lag,
+                'Sharpe Ratio': results_test['sharpe_ratio'],
+                'Total Return': results_test['total_return_pct'],
+                'Max DD': results_test['max_drawdown_pct'],
+                'Win Rate': results_test['win_rate'],
+                'Num Trades': results_test['num_trades'],
+                'Calmar': results_test['calmar_ratio']
+            })
+    
+    lag_df = pd.DataFrame(lag_results)
+    
+    # Display table
+    st.dataframe(
+        lag_df.style.format({
+            'Sharpe Ratio': '{:.3f}',
+            'Total Return': '{:.2%}',
+            'Max DD': '{:.2%}',
+            'Win Rate': '{:.2%}',
+            'Calmar': '{:.2f}',
+            'Num Trades': '{:.0f}'
+        }).background_gradient(subset=['Sharpe Ratio'], cmap='RdYlGn', vmin=-0.5, vmax=1.0),
+        use_container_width=True,
+        hide_index=True
+    )
+    
+    # Chart: Sharpe ratio by lag
+    fig_lag = go.Figure()
+    fig_lag.add_trace(go.Scatter(
+        x=lag_df['Lag (days)'],
+        y=lag_df['Sharpe Ratio'],
+        mode='lines+markers',
+        marker=dict(size=10, color=lag_df['Sharpe Ratio'], colorscale='RdYlGn', showscale=True),
+        line=dict(width=2, color='blue'),
+        text=[f"Lag {x}: {y:.3f}" for x, y in zip(lag_df['Lag (days)'], lag_df['Sharpe Ratio'])],
+        hovertemplate='<b>Lag %{x} days</b><br>Sharpe: %{y:.3f}<extra></extra>'
+    ))
+    fig_lag.update_layout(
+        title="Sharpe Ratio vs Signal Lag",
+        xaxis_title="Signal Lag (days)",
+        yaxis_title="Sharpe Ratio",
+        height=400,
+        hovermode='x unified'
+    )
+    st.plotly_chart(fig_lag, use_container_width=True)
+    
+    # Best lag analysis
+    best_lag_idx = lag_df['Sharpe Ratio'].idxmax()
+    best_lag = lag_df.loc[best_lag_idx, 'Lag (days)']
+    best_sharpe = lag_df.loc[best_lag_idx, 'Sharpe Ratio']
+    
+    if best_lag == 0:
+        st.success(
+            f"✅ **Optimal Lag: {best_lag} days (immediate entry)**\n\n"
+            f"Sharpe Ratio: {best_sharpe:.3f}\n\n"
+            f"The signal works best when acted upon immediately. "
+            f"Waiting reduces performance, suggesting the signal captures short-term momentum."
+        )
+    else:
+        improvement = ((best_sharpe - lag_df.loc[0, 'Sharpe Ratio']) / 
+                      abs(lag_df.loc[0, 'Sharpe Ratio'])) if lag_df.loc[0, 'Sharpe Ratio'] != 0 else 0
+        st.success(
+            f"✅ **Optimal Lag: {int(best_lag)} days**\n\n"
+            f"Sharpe Ratio: {best_sharpe:.3f} ({improvement:+.1%} vs immediate entry)\n\n"
+            f"Waiting {int(best_lag)} day(s) improves performance, suggesting dispersion changes "
+            f"are truly predictive and not just noise. The lag allows confirmation."
+        )
+    
+    st.markdown("---")
+    
     # Limitations
-    st.subheader("4️⃣ Risks & Limitations")
+    st.subheader("5️⃣ Risks & Limitations")
     
     st.warning(
         "⚠️ **This signal is NOT perfect:**\n\n"
@@ -1040,160 +1259,7 @@ elif tab_choice == "📈 Economic Analysis":
     )
 
 
-# ============================================================================
-# TAB 5: STRATEGY COMPARISON
-# ============================================================================
 
-elif tab_choice == "⚔️ Strategy Comparison":
-    st.title("⚔️ Comparison: Momentum vs Regime")
-    
-    st.info(
-        "**Step 5: Decide which approach is better**\n\n"
-        "We backtest both signals side by side with your parameters. "
-        "Neither is \"correct\" - they just capture different things."
-    )
-    
-    st.markdown("---")
-    
-    with st.spinner("Backtesting both strategies..."):
-        all_results = {}
-        engines = {}
-        
-        for signal_col, name in [
-            ('signal_momentum', 'Momentum'),
-            ('signal_regime', 'Regime')
-        ]:
-            engine = BacktestEngine(
-                signals_df,
-                initial_capital=initial_capital,
-                transaction_fee_bps=fee_bps,
-                max_drawdown_stop=max_dd_stop / 100,
-                verbose=False
-            )
-            results = engine.backtest_strategy(signal_col, name)
-            all_results[name] = results
-            engines[name] = engine
-    
-    st.markdown("---")
-    
-    # Comparison table
-    st.subheader("📊 Side-by-Side Performance")
-    
-    comparison_data = []
-    for name, results in all_results.items():
-        comparison_data.append({
-            'Strategy': name,
-            'Return': f"{results['total_return_pct']:.1%}",
-            'Sharpe': f"{results['sharpe_ratio']:.2f}",
-            'Max DD': f"{results['max_drawdown_pct']:.1%}",
-            'Win Rate': f"{results['win_rate']:.1%}",
-            'Trades': f"{results['num_trades']:.0f}",
-            'Calmar': f"{results['calmar_ratio']:.2f}",
-        })
-    
-    comparison_df = pd.DataFrame(comparison_data)
-    st.dataframe(comparison_df, use_container_width=True, hide_index=True)
-    
-    st.markdown("---")
-    
-    # Equity curves
-    st.subheader("📈 Compared Equity Curves")
-    
-    fig = go.Figure()
-    colors = ['#1f77b4', '#ff7f0e']
-    
-    for (name, _), color in zip(
-        [(k, v) for k, v in all_results.items()],
-        colors
-    ):
-        equity_vals, equity_dates = engines[name].get_equity_curve()
-        fig.add_trace(go.Scatter(
-            x=equity_dates,
-            y=equity_vals,
-            name=name,
-            line=dict(color=color, width=2)
-        ))
-    
-    fig.update_layout(
-        title="Strategy Comparison",
-        xaxis_title="Date",
-        yaxis_title="Portfolio Value ($)",
-        hovermode='x unified',
-        height=450
-    )
-    st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown("---")
-    
-    # Winner analysis
-    st.subheader("🎯 Winner Analysis")
-    
-    best_sharpe_strategy = max(
-        all_results.items(),
-        key=lambda x: x[1]['sharpe_ratio']
-    )[0]
-    best_return_strategy = max(
-        all_results.items(),
-        key=lambda x: x[1]['total_return_pct']
-    )[0]
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.success(f"**Best Sharpe**: {best_sharpe_strategy}")
-        st.metric(
-            "Sharpe Ratio",
-            f"{all_results[best_sharpe_strategy]['sharpe_ratio']:.2f}"
-        )
-    
-    with col2:
-        st.info(f"**Best Return**: {best_return_strategy}")
-        st.metric(
-            "Total Return",
-            f"{all_results[best_return_strategy]['total_return_pct']:.1%}"
-        )
-    
-    with col3:
-        best_overall = best_sharpe_strategy
-        best_val = all_results[best_sharpe_strategy]['sharpe_ratio']
-        st.metric(
-            "Recommendation",
-            f"{best_overall}" if best_val > 0.7 else "None"
-        )
-    
-    st.markdown("---")
-    
-    st.subheader("💡 Final Recommendation")
-    
-    best_overall = best_sharpe_strategy
-    best_sharpe_val = all_results[best_sharpe_strategy]['sharpe_ratio']
-    
-    if best_sharpe_val > 0.80:
-        st.success(
-            f"✅ **{best_overall} is interesting.**\n\n"
-            f"Sharpe of {best_sharpe_val:.2f} suggests a measurable relationship. "
-            f"Before using in production:\n"
-            f"1. Validate forward on 2024-2025\n"
-            f"2. Add other signals\n"
-            f"3. Test rolling stability\n"
-            f"4. Start small on paper"
-        )
-    elif best_sharpe_val > 0.60:
-        st.info(
-            f"⚠️ **{best_overall} shows potential.**\n\n"
-            f"Sharpe of {best_sharpe_val:.2f} is acceptable. "
-            f"But we would need to:\n"
-            f"1. Improve parameters\n"
-            f"2. Combine with other signals\n"
-            f"3. Validate forward"
-        )
-    else:
-        st.warning(
-            f"❌ **No strategy shows convincing edge.**\n\n"
-            f"Best Sharpe: {best_sharpe_val:.2f}\n\n"
-            f"This is honest - we haven't found an exploitable relationship alone. "
-            f"We would need to combine with other fundamental signals."
-        )
 
 # ============================================================================
 # FOOTER

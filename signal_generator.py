@@ -27,43 +27,58 @@ class SignalGenerator:
         signal_explanations (dict): Economic explanations of signals
     """
     
-    def __init__(self, clean_data: pd.DataFrame, verbose: bool = True):
+    def __init__(self, clean_data: pd.DataFrame, signal_lag: int = 0, verbose: bool = True):
         """
         Initialize SignalGenerator.
         
         Args:
             clean_data: Output from DataManager.get_clean_data()
+            signal_lag: Number of days to wait before acting on signal (0-5)
             verbose: Display logs
         """
         self.data = clean_data.copy()
         self.features = None
+        self.signal_lag = signal_lag
         self.verbose = verbose
         
+        # Position sizing thresholds (based on momentum z-score)
+        # MULTI-THRESHOLD APPROACH: Graduated conviction levels
+        self.extreme_threshold = 2.5     # |z| ≥ 2.5 → 100% position (EXTREME)
+        self.very_strong_threshold = 2.0 # 2.0 ≤ |z| < 2.5 → 75% position (VERY STRONG)
+        self.strong_threshold = 1.5      # 1.5 ≤ |z| < 2.0 → 50% position (STRONG)
+        self.medium_threshold = 1.0      # 1.0 ≤ |z| < 1.5 → 25% position (MEDIUM)
+        # All signals with |z| < 1.0 are IGNORED (too weak)
+        
+        # Protective mechanisms
+        self.volatility_threshold = 2.0  # Don't trade if |price_zscore| > 2.0
+        self.persistence_days = 2  # Require 2 consecutive days same signal
+        self.use_multi_threshold = True  # Use graduated position sizing
+        
+        # Regime detection (avoid trading in unfavorable regimes)
+        self.regime_lookback = 90  # Days to assess market regime
+        self.low_vol_threshold = 0.5  # Don't trade if market too calm (z < 0.5σ)
+        
         # Signal explanations
+        lag_text = f" with {signal_lag}-day lag" if signal_lag > 0 else ""
         self.signal_explanations = {
             'momentum': {
-                'description': '📈 Dispersion Momentum Signal',
-                'logic': 'LONG if 5-day change > 0; SHORT if < 0; FLAT otherwise',
+                'description': f'📈 Multi-Threshold Dispersion Signal{lag_text} (Graduated Conviction)',
+                'logic': f'Graduated position sizing: 25% (1.0≤|z|<1.5), 50% (1.5≤|z|<2.0), 75% (2.0≤|z|<2.5), 100% (|z|≥2.5). Protected by: volatility filter, 2-day persistence, regime detection{lag_text}',
                 'economic_meaning': (
-                    'Increasing dispersion suggests better vessel distribution '
-                    '= rising demand = potentially higher prices. '
-                    'The opposite indicates consolidation = weakening demand.'
+                    'Multi-threshold approach balances signal capture with risk management. '
+                    'Stronger signals (higher |z-score|) receive larger allocations. '
+                    'Trades ~15-25% of days vs ~5% with extreme-only approach. '
+                    'Regime detection prevents trading during unfavorable market conditions. '
+                    f'{" Signal lag allows confirmation time." if signal_lag > 0 else ""}'
                 ),
-                'signal_type': 'Technical/Behavioral',
-                'horizon': '5-20 days',
-                'rationale': 'Dispersion changes precede price movements'
-            },
-            'regime': {
-                'description': '🎯 Regime Signal (Quartiles)',
-                'logic': 'LONG in Q3-Q4 (high); SHORT in Q1 (low); FLAT in Q2',
-                'economic_meaning': (
-                    'High dispersion periods (Q3-Q4) reflect a structurally '
-                    'healthy market with ~41% premium vs Q1. '
-                    'This captures structural state, not fine timing.'
-                ),
-                'signal_type': 'Structural/Fundamental',
-                'horizon': 'Multi-week',
-                'rationale': 'Captures global supply/demand equilibrium state'
+                'signal_type': 'Multi-Threshold Momentum with Regime Detection',
+                'horizon': '5-20 days (moderate frequency)',
+                'rationale': (
+                    'Graduated position sizing allows participating in strong signals (|z|≥1.0) '
+                    'while maintaining larger positions for extreme events (|z|≥2.5). '
+                    'More aggressive than extreme-only but still filters weak signals (|z|<1.0). '
+                    'Balances transaction costs with signal capture. Combine with other indicators for best results.'
+                )
             }
         }
         
@@ -144,34 +159,123 @@ class SignalGenerator:
             raise
     
     def _generate_signals(self) -> None:
-        """Generate the 2 simple signals."""
+        """Generate the momentum signal - EXTREME EVENTS ONLY."""
         try:
-            # SIGNAL 1: Momentum
-            self.features['signal_momentum'] = np.where(
+            # Direction: +1 (LONG), -1 (SHORT), 0 (FLAT)
+            signal_direction = np.where(
                 self.features['avg_disp_change_5d'] > 0, 1,
                 np.where(self.features['avg_disp_change_5d'] < 0, -1, 0)
             )
-            self.features['signal_momentum_strength'] = (
-                self.features['momentum_zscore'].abs()
-            )
             
-            # SIGNAL 2: Regime
-            self.features['signal_regime'] = 0
-            self.features.loc[
-                self.features['disp_quartile'].isin(['Q3_Medium_High', 'Q4_High']),
-                'signal_regime'
-            ] = 1
-            self.features.loc[
-                self.features['disp_quartile'] == 'Q1_Low',
-                'signal_regime'
-            ] = -1
+            # Strength: absolute z-score
+            strength = self.features['momentum_zscore'].abs()
             
-            self.features['signal_regime_strength'] = (
-                self.features['avg_disp_zscore'].abs()
-            )
+            # MULTI-THRESHOLD POSITION SIZING: Graduated conviction levels
+            # More aggressive than extreme-only, but still filters weak signals
+            if self.use_multi_threshold:
+                # Graduated position sizing based on z-score strength:
+                # |z| ≥ 2.5 → 100% (EXTREME - very rare, ~2% of days)
+                # 2.0 ≤ |z| < 2.5 → 75% (VERY STRONG - rare, ~3% of days)
+                # 1.5 ≤ |z| < 2.0 → 50% (STRONG - uncommon, ~5% of days)
+                # 1.0 ≤ |z| < 1.5 → 25% (MEDIUM - occasional, ~10% of days)
+                # |z| < 1.0 → 0% (WEAK - filtered out, ~80% of days)
+                position_size = np.where(
+                    strength >= self.extreme_threshold, 1.00,      # 100% for extreme
+                    np.where(
+                        strength >= self.very_strong_threshold, 0.75,  # 75% for very strong
+                        np.where(
+                            strength >= self.strong_threshold, 0.50,      # 50% for strong
+                            np.where(
+                                strength >= self.medium_threshold, 0.25,     # 25% for medium
+                                0.0  # 0% for weak
+                            )
+                        )
+                    )
+                )
+            else:
+                # Extreme-only logic (conservative)
+                position_size = np.where(strength >= 2.0, 1.00, 0.0)
+            
+            # Combine direction and size: signal ranges from -1.0 to +1.0
+            signal_raw = signal_direction * position_size
+            
+            # PROTECTIVE MECHANISM 1: Volatility Filter
+            # Don't trade when price volatility is extreme
+            price_zscore_abs = self.features['price_zscore'].abs()
+            volatility_filter = price_zscore_abs > self.volatility_threshold
+            signal_raw = np.where(volatility_filter, 0, signal_raw)
+            
+            # PROTECTIVE MECHANISM 1b: Regime Detection (NEW)
+            # Avoid trading in low-volatility regimes where relationship breaks down
+            # Calculate rolling regime indicator
+            regime_volatility = self.features['momentum_zscore'].abs().rolling(self.regime_lookback).mean()
+            low_vol_regime = regime_volatility < self.low_vol_threshold
+            signal_raw = np.where(low_vol_regime, 0, signal_raw)
+            
+            # PROTECTIVE MECHANISM 2: Signal Persistence
+            # Require N consecutive days of same signal direction
+            signal_series = pd.Series(signal_raw)
+            signal_direction_series = pd.Series(np.sign(signal_raw))
+            
+            # Check if previous N days had same direction (non-zero)
+            persistent_signal = signal_raw.copy()
+            for i in range(len(signal_raw)):
+                if i < self.persistence_days:
+                    persistent_signal[i] = 0  # Not enough history
+                else:
+                    # Check if all previous persistence_days have same direction
+                    recent_directions = signal_direction_series.iloc[i-self.persistence_days:i]
+                    current_direction = signal_direction_series.iloc[i]
+                    
+                    # All must be same sign and non-zero
+                    if current_direction != 0:
+                        if not all(recent_directions == current_direction):
+                            persistent_signal[i] = 0  # Not persistent enough
+                    else:
+                        persistent_signal[i] = 0
+            
+            # Apply lag: shift signal forward by signal_lag days
+            # Signal from day T is used on day T+lag
+            if self.signal_lag > 0:
+                self.features['signal_momentum'] = pd.Series(persistent_signal).shift(self.signal_lag).fillna(0).values
+            else:
+                self.features['signal_momentum'] = persistent_signal
+            
+            self.features['signal_momentum_strength'] = strength
+            self.features['signal_momentum_size'] = np.abs(persistent_signal)
             
             if self.verbose:
-                print("✓ Signals generated (Momentum + Regime)")
+                lag_msg = f" with {self.signal_lag}-day lag" if self.signal_lag > 0 else ""
+                # Count signals after all filters
+                final_signals = persistent_signal
+                filtered_by_volatility = volatility_filter.sum()
+                filtered_by_regime = low_vol_regime.sum()
+                
+                # Count by threshold before persistence filter
+                extreme_count_raw = (strength >= self.extreme_threshold).sum()
+                very_strong_count_raw = ((strength >= self.very_strong_threshold) & (strength < self.extreme_threshold)).sum()
+                strong_count_raw = ((strength >= self.strong_threshold) & (strength < self.very_strong_threshold)).sum()
+                medium_count_raw = ((strength >= self.medium_threshold) & (strength < self.strong_threshold)).sum()
+                
+                # Count final signals after all filters
+                extreme_count = (np.abs(final_signals) == 1.00).sum()
+                very_strong_count = (np.abs(final_signals) == 0.75).sum()
+                strong_count = (np.abs(final_signals) == 0.50).sum()
+                medium_count = (np.abs(final_signals) == 0.25).sum()
+                flat_count = (final_signals == 0).sum()
+                total_active = extreme_count + very_strong_count + strong_count + medium_count
+                
+                print(f"✓ Signal generated (MULTI-THRESHOLD{lag_msg})")
+                print(f"  Graduated position sizing: |z| ≥ {self.medium_threshold}σ minimum")
+                print(f"  Protective filters applied:")
+                print(f"    - Multi-threshold: {extreme_count_raw} extreme, {very_strong_count_raw} very strong, {strong_count_raw} strong, {medium_count_raw} medium detected")
+                print(f"    - Volatility filter: {filtered_by_volatility} days blocked (|price_z| > {self.volatility_threshold}σ)")
+                print(f"    - Regime detection: {filtered_by_regime} days blocked (low-vol regime)")
+                print(f"    - Signal persistence: {self.persistence_days} consecutive days required")
+                print(f"  Final signals after all filters:")
+                print(f"    - {extreme_count} EXTREME (100%), {very_strong_count} VERY STRONG (75%), {strong_count} STRONG (50%), {medium_count} MEDIUM (25%)")
+                print(f"    - {flat_count} FLAT (0%)")
+                print(f"  Trading frequency: {total_active}/{len(final_signals)} = {100*total_active/len(final_signals):.1f}% of days")
         except Exception as e:
             print(f"✗ Error generating signals: {e}")
             raise
@@ -190,7 +294,7 @@ class SignalGenerator:
         display_cols = [
             'date', 'price_5tc', 'avg_dispersion', 'cape_dispersion', 
             'vloc_dispersion', 'disp_quartile', 'avg_disp_change_5d', 
-            'signal_momentum', 'signal_regime', 'return_5d'
+            'signal_momentum', 'return_5d'
         ]
         return self.features[display_cols].tail(n_rows).copy()
     
@@ -200,7 +304,7 @@ class SignalGenerator:
             return {}
         
         available_signals = [
-            col for col in ['signal_momentum', 'signal_regime']
+            col for col in ['signal_momentum']
             if col in self.features.columns
         ]
         
@@ -212,8 +316,8 @@ class SignalGenerator:
         
         for signal_name in available_signals:
             signal_col = signal_name
-            long_days = df[signal_col] == 1
-            short_days = df[signal_col] == -1
+            long_days = df[signal_col] > 0
+            short_days = df[signal_col] < 0
             flat_days = df[signal_col] == 0
             
             stats[signal_name] = {
@@ -258,12 +362,15 @@ class SignalGenerator:
         
         def signal_to_text(val):
             if val > 0:
-                return "🟢 LONG"
+                size_pct = int(val * 100)
+                return f"🟢 LONG ({size_pct}%)"
             elif val < 0:
-                return "🔴 SHORT"
+                size_pct = int(abs(val) * 100)
+                return f"🔴 SHORT ({size_pct}%)"
             else:
-                return "⚪ FLAT"
+                return "⚪ FLAT (0%)"
         
+        lag_info = f" (applied with {self.signal_lag}-day lag)" if self.signal_lag > 0 else ""
         summary = f"""
 ╔══════════════════════════════════════════════════════════════╗
 ║                    CURRENT SIGNAL STATE                     ║
@@ -278,12 +385,9 @@ MARKET CURRENTLY:
 • Regime: {latest['disp_quartile']}
 • Dispersion Z-score: {latest['avg_disp_zscore']:.2f}
 
-SIGNALS TODAY:
+SIGNAL TODAY{lag_info}:
 • Momentum: {signal_to_text(latest['signal_momentum'])}
   (5-day change: {latest['avg_disp_change_5d']:+.1f}, strength: {latest['momentum_zscore']:.2f}σ)
-  
-• Regime: {signal_to_text(latest['signal_regime'])}
-  (Regime: {latest['disp_quartile']})
 
 EXPECTED RETURN (5 days):
 • Historical average on similar signals: {latest['return_5d']:+.1%}
