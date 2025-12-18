@@ -110,9 +110,8 @@ tab_choice = st.sidebar.radio(
     "Navigation",
     [
         "📊 Data Overview",
-        "🎯 Signal Explorer",
-        "🏬 Backtest Results",
-        "📈 Economic Analysis"
+        "⚡ Strategy & Performance",
+        "📈 Optimization & Analysis"
     ]
 )
 
@@ -122,7 +121,7 @@ st.sidebar.subheader("⚙️ Signal Parameters")
 signal_lag = st.sidebar.slider(
     "Signal Lag (days)",
     min_value=0,
-    max_value=14,
+    max_value=20,
     value=0,
     step=1,
     help="Wait N days after signal before entering position (0 = immediate). Test if dispersion momentum leads prices by several days."
@@ -640,460 +639,557 @@ if tab_choice == "📊 Data Overview":
 
 
 # ============================================================================
-# TAB 2: SIGNAL EXPLORER
+# TAB 2: STRATEGY & PERFORMANCE (MERGED)
 # ============================================================================
 
-elif tab_choice == "🎯 Signal Explorer":
-    st.title("🎯 Signal Explorer: Momentum Strategy")
+elif tab_choice == "⚡ Strategy & Performance":
+    st.title("⚡ Strategy Analysis & Performance Dashboard")
     
-    st.info(
-        "**Step 2: Understand the signal**\n\n"
-        "We use a simple momentum-based signal derived from dispersion changes:\n"
-        "- **LONG** when dispersion increases (vessels spreading out)\n"
-        "- **SHORT** when dispersion decreases (vessels concentrating)\n\n"
-        "This captures short-term vessel positioning dynamics that may precede price movements."
-    )
+    # Strategy overview banner
+    col_banner1, col_banner2, col_banner3 = st.columns(3)
+    with col_banner1:
+        st.metric("📊 Strategy Type", "Multi-Threshold Momentum")
+    with col_banner2:
+        active_pct = (signals_df['signal_momentum'] != 0).sum() / len(signals_df)
+        st.metric("📅 Active Days", f"{active_pct:.1%}", f"{(signals_df['signal_momentum'] != 0).sum():,} of {len(signals_df):,}")
+    with col_banner3:
+        st.metric("⏱️ Signal Lag", f"{signal_lag} days", "Immediate" if signal_lag == 0 else "Delayed")
     
-    # Signal lag info
-    if signal_lag > 0:
-        st.warning(
-            f"⏱️ **Signal Lag Applied: {signal_lag} day(s)**\n\n"
-            f"Signal from day T is used to enter position on day T+{signal_lag}. "
-            f"This allows confirmation time and tests if dispersion changes are truly predictive."
+    st.markdown("---")
+    
+    # Create sub-tabs for different aspects
+    subtab1, subtab2, subtab3, subtab4 = st.tabs([
+        "🎯 Signal Logic",
+        "📊 Performance Metrics", 
+        "📋 Trade Analysis",
+        "💾 Export Results"
+    ])
+    
+    # ========================================================================
+    # SUBTAB 1: SIGNAL LOGIC
+    # ========================================================================
+    
+    with subtab1:
+        st.header("🎯 Trading Signal Explanation")
+        
+        explanations = sg.get_all_explanations()
+        exp = explanations['momentum']
+        
+        # Quick summary card
+        st.info(
+            "**Core Strategy:** Multi-threshold momentum based on vessel dispersion changes\n\n"
+            "📈 **LONG** when vessels disperse (spreading globally) → bullish positioning\n\n"
+            "📉 **SHORT** when vessels concentrate (clustering regionally) → bearish positioning"
+        )
+        
+        col_logic1, col_logic2 = st.columns(2)
+        
+        with col_logic1:
+            st.markdown("**📋 Strategy Details:**")
+            st.markdown(f"- **Type:** {exp['signal_type']}")
+            st.markdown(f"- **Horizon:** {exp['horizon']}")
+            st.markdown(f"- **Lag:** {signal_lag} days")
+            
+        with col_logic2:
+            st.markdown("**⚙️ Core Logic:**")
+            st.code(exp['logic'], language=None)
+        
+        st.markdown("---")
+        
+        # Position sizing tiers
+        st.subheader("📊 Position Sizing Framework")
+        
+        col_tier1, col_tier2, col_tier3, col_tier4 = st.columns(4)
+        
+        with col_tier1:
+            st.metric("🟢 MEDIUM", "25%", "1.0σ ≤ |z| < 1.5σ")
+            st.caption("~10% of days")
+        with col_tier2:
+            st.metric("🟡 STRONG", "50%", "1.5σ ≤ |z| < 2.0σ")
+            st.caption("~5% of days")
+        with col_tier3:
+            st.metric("🟠 V.STRONG", "75%", "2.0σ ≤ |z| < 2.5σ")
+            st.caption("~3% of days")
+        with col_tier4:
+            st.metric("🔴 EXTREME", "100%", "|z| ≥ 2.5σ")
+            st.caption("~2% of days")
+        
+        st.markdown("---")
+        
+        # Protective mechanisms
+        st.subheader("🛡️ Risk Management Filters")
+        
+        col_protect1, col_protect2, col_protect3 = st.columns(3)
+        
+        with col_protect1:
+            st.markdown("**1️⃣ Persistence Filter**")
+            st.info("Requires **2 consecutive days** same direction to filter noise")
+        
+        with col_protect2:
+            st.markdown("**2️⃣ Volatility Filter**")
+            st.info("Blocks trading when |price z-score| > **2.0σ** (extreme volatility)")
+        
+        with col_protect3:
+            st.markdown("**3️⃣ Regime Detection**")
+            st.info("Avoids trading in low-volatility regimes (90-day lookback)")
+        
+        st.success(
+            f"**🎯 Bottom Line:** {exp['rationale']}"
+        )
+        
+        # Latest signals preview
+        st.markdown("---")
+        st.subheader("📋 Recent Signals (Last 10 Days)")
+        
+        latest_signals = sg.get_latest_signals(n_rows=10).copy()
+        latest_signals['date'] = latest_signals['date'].dt.strftime('%Y-%m-%d')
+        latest_signals['price_5tc'] = latest_signals['price_5tc'].apply(lambda x: f"${x:.0f}")
+        latest_signals['avg_dispersion'] = latest_signals['avg_dispersion'].apply(lambda x: f"{x:.0f}")
+        latest_signals['return_5d'] = latest_signals['return_5d'].apply(lambda x: f"{x:+.2%}")
+        
+        def signal_emoji(val):
+            if val > 0:
+                size_pct = int(val * 100)
+                return f"🟢 LONG ({size_pct}%)"
+            elif val < 0:
+                size_pct = int(abs(val) * 100)
+                return f"🔴 SHORT ({size_pct}%)"
+            else:
+                return "⚪ FLAT (0%)"
+        
+        latest_signals['Signal'] = latest_signals['signal_momentum'].apply(signal_emoji)
+        
+        display_cols = ['date', 'price_5tc', 'Signal', 'avg_dispersion', 'return_5d']
+        
+        st.dataframe(
+            latest_signals[display_cols],
+            use_container_width=True,
+            hide_index=True
         )
     
-    st.markdown("---")
+    # ========================================================================
+    # SUBTAB 2: PERFORMANCE METRICS
+    # ========================================================================
     
-    # Signal explanation
-    explanations = sg.get_all_explanations()
-    exp = explanations['momentum']
-    
-    st.subheader("📈 Momentum Dispersion Signal")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"**Type**: {exp['signal_type']}")
-        st.markdown(f"**Horizon**: {exp['horizon']}")
-    with col2:
-        st.markdown(f"**Logic**:")
-        st.code(exp['logic'])
-    
-    st.markdown("---")
-    st.info(f"**📖 Economic Meaning**:\n\n{exp['economic_meaning']}")
-    st.success(f"**💡 Rationale**:\n\n{exp['rationale']}")
-    
-    st.markdown("---")
-    
-    # Position sizing explanation
-    st.subheader("🛡️ Multi-Threshold Strategy (Graduated Conviction)")
-    
-    st.warning(
-        "**⚠️ ADAPTED STRATEGY BASED ON EVALUATION ⚠️**\n\n"
-        "Based on comprehensive analysis showing weak correlation (r=0.27), this strategy uses "
-        "**graduated position sizing** to balance signal capture with risk management.\n\n"
-        "**Key Finding:** More aggressive than extreme-only approach, but still filters weak signals (|z|<1.0). "
-        "Combine with other indicators for best results."
-    )
-    
-    st.info(
-        "**Multi-Threshold Position Sizing:**\n\n"
-        "**Position Allocation by Signal Strength:**\n"
-        "- 🔴 **EXTREME** (|z| ≥ 2.5σ) → **100% allocation** (very rare, ~2% of days)\n"
-        "- 🟠 **VERY STRONG** (2.0σ ≤ |z| < 2.5σ) → **75% allocation** (rare, ~3% of days)\n"
-        "- 🟡 **STRONG** (1.5σ ≤ |z| < 2.0σ) → **50% allocation** (uncommon, ~5% of days)\n"
-        "- 🟢 **MEDIUM** (1.0σ ≤ |z| < 1.5σ) → **25% allocation** (occasional, ~10% of days)\n"
-        "- ⚪ **WEAK** (|z| < 1.0σ) → **0% allocation - FLAT** (filtered out, ~80% of days)\n\n"
-        "**Protective Filters:**\n\n"
-        "**1️⃣ Signal Persistence**\n"
-        "- Requires **2 consecutive days** of same signal direction\n"
-        "- Filters out 1-day spikes and random noise\n\n"
-        "**2️⃣ Regime Detection**\n"
-        "- Avoids trading in low-volatility regimes (90-day rolling average)\n"
-        "- Addresses non-stationarity risk\n\n"
-        "**3️⃣ Volatility Filter**\n"
-        "- Blocks trading when |price z-score| > 2.0σ (extreme market volatility)\n\n"
-        "**Result:** ~15-25% of days have active positions, graduated by conviction level. "
-        "Higher signal capture than extreme-only, lower than aggressive approaches."
-    )
-    
-    # Show position size distribution
-    if 'signal_momentum_size' in signals_df.columns:
-        size_dist = signals_df['signal_momentum_size'].value_counts().sort_index()
+    with subtab2:
+        st.header("📊 Backtest Performance Dashboard")
         
-        col_size1, col_size2, col_size3, col_size4, col_size5 = st.columns(5)
-        with col_size1:
-            extreme_count = (signals_df['signal_momentum_size'] == 1.0).sum()
-            extreme_pct = 100 * extreme_count / len(signals_df)
-            st.metric("🔴 EXTREME", f"{extreme_count:,}", f"100% ({extreme_pct:.1f}%)")
-        with col_size2:
-            very_strong_count = (signals_df['signal_momentum_size'] == 0.75).sum()
-            very_strong_pct = 100 * very_strong_count / len(signals_df)
-            st.metric("🟠 VERY STRONG", f"{very_strong_count:,}", f"75% ({very_strong_pct:.1f}%)")
-        with col_size3:
-            strong_count = (signals_df['signal_momentum_size'] == 0.50).sum()
-            strong_pct = 100 * strong_count / len(signals_df)
-            st.metric("🟡 STRONG", f"{strong_count:,}", f"50% ({strong_pct:.1f}%)")
-        with col_size4:
-            medium_count = (signals_df['signal_momentum_size'] == 0.25).sum()
-            medium_pct = 100 * medium_count / len(signals_df)
-            st.metric("🟢 MEDIUM", f"{medium_count:,}", f"25% ({medium_pct:.1f}%)")
-        with col_size5:
-            flat_count = (signals_df['signal_momentum'] == 0).sum()
-            flat_pct = 100 * flat_count / len(signals_df)
-            st.metric("⚪ FLAT", f"{flat_count:,}", f"0% ({flat_pct:.1f}%)")
-    
-    st.markdown("---")
-    
-    # Signal statistics
-    st.subheader("📊 Signal Performance (Historical)")
-    
-    signal_stats = sg.get_signal_statistics()
-    
-    if 'signal_momentum' in signal_stats:
-        stats = signal_stats['signal_momentum']
+        # Run backtest
+        signal_col = 'signal_momentum'
+        strategy_choice = 'Momentum'
         
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("Days LONG", f"{stats.get('long_signals', 0):.0f}")
-            st.metric("Avg Return LONG", f"{stats.get('avg_return_on_long', 0):.2%}")
-        with col2:
-            st.metric("Days SHORT", f"{stats.get('short_signals', 0):.0f}")
-            st.metric("Avg Return SHORT", f"{stats.get('avg_return_on_short', 0):.2%}")
-        with col3:
-            st.metric("Days FLAT", f"{stats.get('flat_signals', 0):.0f}")
-            st.metric("Win Rate LONG", f"{stats.get('win_rate_long', 0):.1%}")
-        with col4:
-            total_days = stats.get('total_signals', 0)
-            active_pct = (stats.get('long_signals', 0) + stats.get('short_signals', 0)) / total_days if total_days > 0 else 0
-            st.metric("Total Days", f"{total_days:.0f}")
-            st.metric("Active %", f"{active_pct:.1%}")
-    
-    st.info(
-        "**Interpretation:**\n\n"
-        "- **Active %**: Percentage of time the signal is LONG or SHORT (not FLAT)\n"
-        "- **Avg Return**: Average 5-day forward return when signal is active\n"
-        "- **Win Rate LONG**: % of LONG signals that were profitable"
-    )
-    
-    st.markdown("---")
-    
-    # Latest signals
-    st.subheader("📋 Latest Signals (15 days)")
-    
-    latest_signals = sg.get_latest_signals(n_rows=15).copy()
-    latest_signals['date'] = latest_signals['date'].dt.strftime('%Y-%m-%d')
-    latest_signals['price_5tc'] = latest_signals['price_5tc'].apply(lambda x: f"${x:.0f}")
-    latest_signals['avg_dispersion'] = latest_signals['avg_dispersion'].apply(lambda x: f"{x:.0f}")
-    latest_signals['return_5d'] = latest_signals['return_5d'].apply(lambda x: f"{x:+.2%}")
-    
-    def signal_emoji(val):
-        if val > 0:
-            size_pct = int(val * 100)
-            return f"🟢 LONG ({size_pct}%)"
-        elif val < 0:
-            size_pct = int(abs(val) * 100)
-            return f"🔴 SHORT ({size_pct}%)"
+        with st.spinner("Running backtest..."):
+            engine = BacktestEngine(
+                signals_df,
+                initial_capital=initial_capital,
+                transaction_fee_bps=fee_bps
+            )
+            results = engine.backtest_strategy(signal_col, strategy_choice)
+        
+        # Configuration info
+        with st.expander("⚙️ Backtest Configuration"):
+            conf_col1, conf_col2, conf_col3, conf_col4 = st.columns(4)
+            with conf_col1:
+                st.metric("Initial Capital", f"${initial_capital:,}")
+            with conf_col2:
+                st.metric("Transaction Fees", f"{fee_bps} bps")
+            with conf_col3:
+                st.metric("Position Sizing", "Multi-Threshold")
+            with conf_col4:
+                st.metric("Persistence", "2 days")
+        
+        st.markdown("---")
+        
+        # Key Performance Indicators
+        st.subheader("📈 Key Performance Indicators")
+        
+        metric_cols = st.columns(5)
+        
+        with metric_cols[0]:
+            st.metric(
+                "Total Return",
+                f"{results['total_return_pct']:.1%}",
+                f"${results['total_pnl']:,.0f}"
+            )
+        
+        with metric_cols[1]:
+            sharpe_color = "normal" if results['sharpe_ratio'] < 0.5 else "inverse"
+            st.metric(
+                "Sharpe Ratio",
+                f"{results['sharpe_ratio']:.2f}",
+                "Risk-adjusted",
+                delta_color=sharpe_color
+            )
+        
+        with metric_cols[2]:
+            st.metric(
+                "Max Drawdown",
+                f"{results['max_drawdown_pct']:.1%}",
+                "Worst loss"
+            )
+        
+        with metric_cols[3]:
+            st.metric(
+                "Win Rate",
+                f"{results['win_rate']:.1%}",
+                f"{results['winning_trades']}/{results['num_trades']}"
+            )
+        
+        with metric_cols[4]:
+            st.metric(
+                "Calmar Ratio",
+                f"{results['calmar_ratio']:.2f}",
+                "Return/DD"
+            )
+        
+        # Performance interpretation
+        if results['sharpe_ratio'] >= 1.0:
+            st.success("✅ **Strong Performance:** Sharpe ≥ 1.0 indicates excellent risk-adjusted returns")
+        elif results['sharpe_ratio'] >= 0.5:
+            st.info("ℹ️ **Moderate Performance:** Sharpe 0.5-1.0 indicates acceptable risk-adjusted returns")
         else:
-            return "⚪ FLAT (0%)"
-    
-    latest_signals['Signal'] = latest_signals['signal_momentum'].apply(signal_emoji)
-    
-    display_cols = [
-        'date', 'price_5tc', 'avg_dispersion', 'disp_quartile',
-        'Signal', 'return_5d'
-    ]
-    
-    st.dataframe(
-        latest_signals[display_cols],
-        use_container_width=True,
-        hide_index=True
-    )
-
-
-# ============================================================================
-# TAB 3: BACKTEST RESULTS
-# ============================================================================
-
-elif tab_choice == "🏬 Backtest Results":
-    st.title("🏬 Backtest Results & Performance")
-    
-    st.warning(
-        "**⚠️ MULTI-THRESHOLD STRATEGY ⚠️**\n\n"
-        "This strategy uses **graduated position sizing** based on signal strength:\n"
-        "- Stronger signals (higher |z-score|) receive larger allocations\n"
-        "- More aggressive than extreme-only, but still filters weak signals\n"
-        "- Trades ~15-25% of days vs ~5% with extreme-only or ~60% with old approach\n\n"
-        "**Combine with other indicators** for best results."
-    )
-    
-    st.info(
-        f"**Backtest configuration:**\n"
-        f"- 💰 Initial Capital: ${initial_capital:,}\n"
-        f"- 💸 Fees: {fee_bps} bps per trade\n"
-        f"- 🎯 Position Sizing: 25% (|z|≥1.0), 50% (|z|≥1.5), 75% (|z|≥2.0), 100% (|z|≥2.5)\n"
-        f"- 🛡️ Persistence: 2 consecutive days\n"
-        f"- 📊 Regime Detection: Enabled (90-day lookback)\n\n"
-        "Results reflect the multi-threshold graduated conviction strategy."
-    )
-    
-    st.markdown("---")
-    
-    # Run backtest
-    signal_col = 'signal_momentum'
-    strategy_choice = 'Momentum'
-    
-    with st.spinner("Running backtest..."):
-        engine = BacktestEngine(
-            signals_df,
-            initial_capital=initial_capital,
-            transaction_fee_bps=fee_bps
-        )
-        results = engine.backtest_strategy(signal_col, strategy_choice)
-    
-    st.markdown("---")
-    
-    # Key metrics
-    st.subheader("📊 Performance Metrics")
-    
-    metric_cols = st.columns(5)
-    
-    with metric_cols[0]:
-        st.metric(
-            "Total Return",
-            f"{results['total_return_pct']:.1%}",
-            f"${results['total_pnl']:,.0f}"
-        )
-    
-    with metric_cols[1]:
-        st.metric(
-            "Sharpe Ratio",
-            f"{results['sharpe_ratio']:.2f}",
-            "Risk-adjusted"
-        )
-    
-    with metric_cols[2]:
-        st.metric(
-            "Max Drawdown",
-            f"{results['max_drawdown_pct']:.1%}",
-            "Worst loss"
-        )
-    
-    with metric_cols[3]:
-        st.metric(
-            "Win Rate",
-            f"{results['win_rate']:.1%}",
-            f"{results['winning_trades']}/{results['num_trades']}"
-        )
-    
-    with metric_cols[4]:
-        st.metric(
-            "Calmar Ratio",
-            f"{results['calmar_ratio']:.2f}",
-            "Return/Drawdown"
-        )
-    
-    st.info(
-        "**How to interpret:**\n\n"
-        "- **Sharpe > 0.75**: Good signal (acceptable risk-adjusted)\n"
-        "- **Drawdown < 15%**: Acceptable for commodities\n"
-        "- **Win Rate ~50%**: Normal (gains > losses in size)\n"
-        "- **Fee sensitivity**: Does the edge disappear with real fees?"
-    )
-    
-    st.markdown("---")
-    
-    # Equity curve
-    st.subheader("📈 Equity Curve")
-    
-    equity_vals, equity_dates = engine.get_equity_curve()
-    
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=equity_dates,
-        y=equity_vals,
-        fill='tozeroy',
-        name='Portfolio Value',
-        line=dict(color='#1f77b4', width=2)
-    ))
-    fig.update_layout(
-        title=f"Portfolio Growth ({strategy_choice})",
-        xaxis_title="Date",
-        yaxis_title="Value ($)",
-        hovermode='x unified',
-        height=450
-    )
-    st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown("---")
-    
-    # Fee sensitivity
-    st.subheader("💰 Transaction Fee Sensitivity")
-    
-    st.info(
-        "**Importance**: As fees increase, the edge diminishes. "
-        "A robust strategy remains profitable even with high fees."
-    )
-    
-    fee_levels = [0, 5, 10, 15, 20, 30, 50]
-    sensitivity_df = engine.compare_fees_sensitivity(signal_col, strategy_choice, fee_levels)
-    
-    st.dataframe(sensitivity_df, use_container_width=True, hide_index=True)
-    
-    st.warning(
-        "⚠️ **Important Observation**:\n\n"
-        "If Sharpe drops drastically between 0 and 10 bps, "
-        "the strategy does NOT withstand real fees. "
-        "In this case, it wouldn't be worth trading."
-    )
-    
-    st.markdown("---")
-    
-    # Trade log
-    st.subheader("📋 Trade Log (Last 20)")
-    
-    trade_log = engine.get_trade_log()
-    
-    if len(trade_log) > 0:
-        display_log = trade_log.tail(20).copy()
-        display_log['entry_date'] = display_log['entry_date'].dt.strftime('%Y-%m-%d')
-        display_log['exit_date'] = display_log['exit_date'].dt.strftime('%Y-%m-%d')
-        display_log['entry_price'] = display_log['entry_price'].apply(lambda x: f"${x:.0f}")
-        display_log['exit_price'] = display_log['exit_price'].apply(lambda x: f"${x:.0f}")
-        display_log['net_pnl'] = display_log['net_pnl'].apply(lambda x: f"${x:,.0f}")
-        display_log['return_pct'] = display_log['return_pct'].apply(lambda x: f"{x:+.2%}")
+            st.warning("⚠️ **Weak Performance:** Sharpe < 0.5 suggests high risk relative to returns")
         
-        st.dataframe(display_log, use_container_width=True, hide_index=True)
+        st.markdown("---")
         
-        st.info(f"Showing last 20 trades. Total trades: {len(trade_log)}")
-    else:
-        st.info("No trades executed for this signal.")
-    
-    st.markdown("---")
-    
-    # Export functionality
-    st.subheader("💾 Export Backtest Results")
-    
-    st.info(
-        "**Export Options:**\n\n"
-        "Download complete backtest results including:\n"
-        "- Summary with all parameters (lag, capital, fees)\n"
-        "- Complete trade log with all trades\n"
-        "- Equity curve data\n\n"
-        "Choose format: **Excel** (single file, multiple sheets) or **CSV** (separate files)"
-    )
-    
-    col_export1, col_export2, col_export3 = st.columns([2, 1, 1])
-    
-    with col_export1:
-        export_filename = st.text_input(
-            "Filename (without extension)",
-            value=f"backtest_lag{signal_lag}_capital{initial_capital//1000}k_fees{fee_bps}bps_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-            help="Customize the export filename"
+        # Equity curve
+        st.subheader("📈 Portfolio Growth")
+        
+        equity_vals, equity_dates = engine.get_equity_curve()
+        
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=equity_dates,
+            y=equity_vals,
+            fill='tozeroy',
+            name='Portfolio Value',
+            line=dict(color='#1f77b4', width=2),
+            hovertemplate='Date: %{x}<br>Value: $%{y:,.0f}<extra></extra>'
+        ))
+        
+        # Add initial capital line
+        fig.add_hline(
+            y=initial_capital,
+            line_dash="dash",
+            line_color="gray",
+            annotation_text=f"Initial: ${initial_capital:,}"
         )
-    
-    with col_export2:
-        export_format = st.selectbox(
-            "Format",
-            options=["xlsx", "csv"],
-            help="Excel = single file with multiple sheets, CSV = separate files"
+        
+        fig.update_layout(
+            title=f"Equity Curve - {strategy_choice} Strategy",
+            xaxis_title="Date",
+            yaxis_title="Portfolio Value ($)",
+            hovermode='x unified',
+            height=450
         )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # Fee sensitivity
+        st.subheader("💰 Fee Sensitivity Analysis")
+        
+        col_fee1, col_fee2 = st.columns([2, 1])
+        
+        with col_fee2:
+            st.info(
+                "**Why it matters:**\n\n"
+                "Real-world trading incurs fees. "
+                "A robust strategy maintains edge even with realistic transaction costs (10-20 bps)."
+            )
+        
+        with col_fee1:
+            fee_levels = [0, 5, 10, 15, 20, 30, 50]
+            sensitivity_df = engine.compare_fees_sensitivity(signal_col, strategy_choice, fee_levels)
+            
+            st.dataframe(sensitivity_df, use_container_width=True, hide_index=True)
+        
+        if results['sharpe_ratio'] > 0 and float(sensitivity_df[sensitivity_df['Fees (bps)'] == 20]['Sharpe'].values[0]) < 0:
+            st.warning(
+                "⚠️ **Fee Sensitivity Alert:** Sharpe turns negative above 20 bps. "
+                "Strategy edge is fragile - requires very low execution costs."
+            )
     
-    with col_export3:
-        st.write("")  # Spacing
-        st.write("")  # Spacing
-        if st.button("📥 Export Results", type="primary", use_container_width=True):
-            try:
-                # Prepare export path
-                export_path = Path("export") / export_filename
-                
-                # Export using BacktestEngine method
-                engine.export_results(
-                    filepath=str(export_path),
-                    signal_lag=signal_lag,
-                    file_format=export_format
+    # ========================================================================
+    # SUBTAB 3: TRADE ANALYSIS
+    # ========================================================================
+    
+    with subtab3:
+        st.header("📋 Trade-Level Analysis")
+        
+        trade_log = engine.get_trade_log()
+        
+        if len(trade_log) > 0:
+            # Trade statistics
+            col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+            
+            with col_stat1:
+                st.metric("Total Trades", f"{len(trade_log):,}")
+            with col_stat2:
+                avg_duration = trade_log['days_held'].mean()
+                st.metric("Avg Duration", f"{avg_duration:.1f} days")
+            with col_stat3:
+                total_fees = trade_log['fee_cost'].sum()
+                st.metric("Total Fees Paid", f"${total_fees:,.0f}")
+            with col_stat4:
+                avg_trade_pnl = trade_log['net_pnl'].mean()
+                st.metric("Avg Trade P&L", f"${avg_trade_pnl:,.0f}")
+            
+            st.markdown("---")
+            
+            # P&L Distribution
+            st.subheader("📊 P&L Distribution")
+            
+            col_chart1, col_chart2 = st.columns(2)
+            
+            with col_chart1:
+                # Histogram of returns
+                fig_hist = go.Figure()
+                fig_hist.add_trace(go.Histogram(
+                    x=trade_log['return_pct'],
+                    nbinsx=30,
+                    marker_color='lightblue',
+                    name='Return %'
+                ))
+                fig_hist.update_layout(
+                    title="Trade Return Distribution",
+                    xaxis_title="Return %",
+                    yaxis_title="Frequency",
+                    height=300
                 )
+                st.plotly_chart(fig_hist, use_container_width=True)
+            
+            with col_chart2:
+                # Win/Loss breakdown
+                wins = (trade_log['net_pnl'] > 0).sum()
+                losses = (trade_log['net_pnl'] < 0).sum()
                 
-                if export_format == 'xlsx':
-                    st.success(f"✅ Results exported to: `export/{export_filename}.xlsx`")
-                else:
-                    st.success(
-                        f"✅ Results exported to:\n"
-                        f"- `export/{export_filename}_summary.csv`\n"
-                        f"- `export/{export_filename}_trades.csv`\n"
-                        f"- `export/{export_filename}_equity.csv`"
-                    )
-                
-                st.info(
-                    "📁 **Files saved in `export/` folder**\n\n"
-                    "The export folder is gitignored to keep your results private."
+                fig_pie = go.Figure(data=[go.Pie(
+                    labels=['Winners', 'Losers'],
+                    values=[wins, losses],
+                    marker_colors=['#28a745', '#dc3545']
+                )])
+                fig_pie.update_layout(
+                    title="Win/Loss Split",
+                    height=300
                 )
-            except Exception as e:
-                st.error(f"❌ Export failed: {e}")
-
-
-# ============================================================================
-# TAB 4: ECONOMIC ANALYSIS
-# ============================================================================
-
-elif tab_choice == "📈 Economic Analysis":
-    st.title("📈 In-Depth Economic Analysis")
+                st.plotly_chart(fig_pie, use_container_width=True)
+            
+            st.markdown("---")
+            
+            # Trade log table
+            st.subheader("📋 Complete Trade Log")
+            
+            # Add filters
+            col_filter1, col_filter2 = st.columns(2)
+            with col_filter1:
+                show_trades = st.selectbox(
+                    "Show trades:",
+                    ["All", "Last 20", "Last 50", "Winners Only", "Losers Only"],
+                    index=1
+                )
+            with col_filter2:
+                sort_by = st.selectbox(
+                    "Sort by:",
+                    ["Exit Date (Recent)", "P&L (High to Low)", "P&L (Low to High)", "Duration"],
+                    index=0
+                )
+            
+            # Filter trades
+            filtered_log = trade_log.copy()
+            if show_trades == "Last 20":
+                filtered_log = filtered_log.tail(20)
+            elif show_trades == "Last 50":
+                filtered_log = filtered_log.tail(50)
+            elif show_trades == "Winners Only":
+                filtered_log = filtered_log[filtered_log['net_pnl'] > 0]
+            elif show_trades == "Losers Only":
+                filtered_log = filtered_log[filtered_log['net_pnl'] < 0]
+            
+            # Sort trades
+            if sort_by == "Exit Date (Recent)":
+                filtered_log = filtered_log.sort_values('exit_date', ascending=False)
+            elif sort_by == "P&L (High to Low)":
+                filtered_log = filtered_log.sort_values('net_pnl', ascending=False)
+            elif sort_by == "P&L (Low to High)":
+                filtered_log = filtered_log.sort_values('net_pnl', ascending=True)
+            elif sort_by == "Duration":
+                filtered_log = filtered_log.sort_values('days_held', ascending=False)
+            
+            # Format for display
+            display_log = filtered_log.copy()
+            display_log['entry_date'] = pd.to_datetime(display_log['entry_date']).dt.strftime('%Y-%m-%d')
+            display_log['exit_date'] = pd.to_datetime(display_log['exit_date']).dt.strftime('%Y-%m-%d')
+            display_log['entry_price'] = display_log['entry_price'].apply(lambda x: f"${x:.0f}")
+            display_log['exit_price'] = display_log['exit_price'].apply(lambda x: f"${x:.0f}")
+            display_log['net_pnl'] = display_log['net_pnl'].apply(lambda x: f"${x:,.0f}")
+            display_log['fee_cost'] = display_log['fee_cost'].apply(lambda x: f"${x:.2f}")
+            display_log['return_pct'] = display_log['return_pct'].apply(lambda x: f"{x:+.2%}")
+            
+            st.dataframe(display_log, use_container_width=True, hide_index=True)
+            
+            st.caption(f"Showing {len(filtered_log)} of {len(trade_log)} total trades")
+        else:
+            st.info("No trades executed. Try adjusting signal parameters or reducing lag.")
     
-    st.info(
-        "**Step 4: Analyze why it's interesting (or not)**\n\n"
-        "Here we look at:\n"
-        "- Statistical correlations\n"
-        "- Pricing by regime (quartiles)\n"
-        "- Risks and limitations"
-    )
+    # ========================================================================
+    # SUBTAB 4: EXPORT RESULTS
+    # ========================================================================
     
-    st.markdown("---")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("1️⃣ The Underlying Relationship")
-        
-        st.markdown("""
-        **Dispersion → 5TC Price**
-        
-        When Capesize vessels are **well dispersed**:
-        - They are positioned where cargoes are loading
-        - Supply matches demand well
-        - The market functions efficiently
-        
-        This tends to coincide with:
-        - Strong demand (multiple regions importing)
-        - Good vessel utilization
-        - Higher freight rates
-        
-        **Inverse logic**: Low dispersion = congestion = weakened rates
-        """)
-    
-    with col2:
-        st.subheader("2️⃣ Statistical Evidence")
-        
-        corr_cape = data_summary['correlation_cape']
-        corr_vloc = data_summary['correlation_vloc']
-        corr_avg = data_summary['correlation_avg']
-        
-        col_a, col_b, col_c = st.columns(3)
-        col_a.metric("Capesize", f"{corr_cape:.3f}")
-        col_b.metric("VLOC", f"{corr_vloc:.3f}")
-        col_c.metric("Average", f"{corr_avg:.3f}")
+    with subtab4:
+        st.header("💾 Export Complete Analysis")
         
         st.info(
-            f"**Interpretation**:\n\n"
-            f"- All correlations are positive ✅\n"
-            f"- But they are weak (~0.27)\n"
-            f"- This only explains ~7% of the variance\n"
-            f"- Other factors dominate the remaining 93%\n\n"
-            f"**Conclusion**: It's a real but modest relationship."
+            "**📦 What's Included:**\n\n"
+            "Export complete backtest results for offline analysis, reporting, or archiving:\n\n"
+            "✅ **Summary Sheet** - All performance metrics and configuration\n\n"
+            "✅ **Trade Log** - Complete trade-by-trade breakdown with P&L\n\n"
+            "✅ **Equity Curve** - Daily portfolio values for charting\n\n"
+            "**Format Options:** Excel (single file, multiple sheets) or CSV (separate files)"
         )
+        
+        col_export1, col_export2 = st.columns([3, 1])
+        
+        with col_export1:
+            export_filename = st.text_input(
+                "📝 Filename",
+                value=f"backtest_lag{signal_lag}_capital{initial_capital//1000}k_fees{fee_bps}bps_{datetime.now().strftime('%Y%m%d_%H%M')}",
+                help="Filename includes key parameters for easy identification"
+            )
+        
+        with col_export2:
+            export_format = st.selectbox(
+                "📄 Format",
+                options=["xlsx", "csv"],
+                format_func=lambda x: "Excel (.xlsx)" if x == "xlsx" else "CSV (.csv)",
+                help="Excel: single file | CSV: 3 separate files"
+            )
+        
+        col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 1])
+        with col_btn2:
+            if st.button("📥 Export Results", type="primary", use_container_width=True):
+                try:
+                    export_path = Path("export") / export_filename
+                    
+                    engine.export_results(
+                        filepath=str(export_path),
+                        signal_lag=signal_lag,
+                        file_format=export_format
+                    )
+                    
+                    if export_format == 'xlsx':
+                        st.success(f"✅ **Exported Successfully!**\n\n`export/{export_filename}.xlsx`")
+                    else:
+                        st.success(
+                            f"✅ **Exported Successfully!**\n\n"
+                            f"Files created:\n"
+                            f"- `{export_filename}_summary.csv`\n"
+                            f"- `{export_filename}_trades.csv`\n"
+                            f"- `{export_filename}_equity.csv`"
+                        )
+                    
+                    st.balloons()
+                    
+                except Exception as e:
+                    st.error(f"❌ Export failed: {e}")
+        
+        st.markdown("---")
+        
+        # Quick stats summary for export preview
+        st.subheader("📊 Export Preview")
+        
+        preview_col1, preview_col2, preview_col3 = st.columns(3)
+        
+        with preview_col1:
+            st.markdown("**Configuration**")
+            st.text(f"Capital: ${initial_capital:,}")
+            st.text(f"Fees: {fee_bps} bps")
+            st.text(f"Lag: {signal_lag} days")
+        
+        with preview_col2:
+            st.markdown("**Performance**")
+            st.text(f"Return: {results['total_return_pct']:.1%}")
+            st.text(f"Sharpe: {results['sharpe_ratio']:.2f}")
+            st.text(f"Max DD: {results['max_drawdown_pct']:.1%}")
+        
+        with preview_col3:
+            st.markdown("**Trading Activity**")
+            st.text(f"Trades: {results['num_trades']}")
+            st.text(f"Win Rate: {results['win_rate']:.1%}")
+            st.text(f"Fees Paid: ${results['total_fees_paid']:,.0f}")
+
+
+# ============================================================================
+# TAB 3: OPTIMIZATION & ANALYSIS
+# ============================================================================
+
+elif tab_choice == "📈 Optimization & Analysis":
+    st.title("📈 Economic Analysis & Optimization")
+    
+    st.info(
+        "**Objective:** Understand the economic relationship between vessel dispersion and freight rates, "
+        "and optimize signal parameters for best performance."
+    )
+    
+    # ========================================================================
+    # SECTION 1: KEY INSIGHTS (TOP)
+    # ========================================================================
+    
+    st.markdown("---")
+    st.header("🎯 Key Insights")
+    
+    corr_avg = data_summary['correlation_avg']
+    r_squared = corr_avg ** 2
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            "📊 Correlation",
+            f"{corr_avg:.3f}",
+            delta="Weak positive"
+        )
+    
+    with col2:
+        st.metric(
+            "📉 R² (Variance Explained)",
+            f"{r_squared:.1%}",
+            delta=f"{100-r_squared*100:.0f}% unexplained"
+        )
+    
+    with col3:
+        # Calculate Q1 vs Q4 premium
+        regime_prices_temp = signals_df.groupby('disp_quartile', observed=True)['price_5tc'].mean()
+        if 'Q1_Low' in regime_prices_temp.index and 'Q4_High' in regime_prices_temp.index:
+            premium_pct = (regime_prices_temp['Q4_High'] - regime_prices_temp['Q1_Low']) / regime_prices_temp['Q1_Low']
+            st.metric(
+                "💰 Q4 vs Q1 Premium",
+                f"{premium_pct:.1%}",
+                delta="Higher dispersion → Higher rates"
+            )
+    
+    with col4:
+        active_days = (signals_df['signal_momentum'] != 0).sum()
+        active_pct = active_days / len(signals_df)
+        st.metric(
+            "📅 Signal Activity",
+            f"{active_pct:.1%}",
+            delta=f"{active_days:,} trading days"
+        )
+    
+    st.success(
+        "**Bottom Line:** Dispersion has a real but modest relationship with freight rates (~27% correlation). "
+        "High dispersion consistently commands premium pricing (+30-50% vs low dispersion), making it a useful "
+        "**filter or confirmation signal** in a multi-factor trading framework."
+    )
     
     st.markdown("---")
     
-    # Quartile analysis
-    st.subheader("3️⃣ Pricing by Regime (Quartile Analysis)")
+    # ========================================================================
+    # SECTION 2: QUARTILE ANALYSIS (VISUAL)
+    # ========================================================================
+    
+    st.header("📊 Price by Dispersion Regime")
     
     regime_prices = signals_df.groupby('disp_quartile', observed=True)[
         'price_5tc'
@@ -1110,54 +1206,84 @@ elif tab_choice == "📈 Economic Analysis":
         premium_pct = (q4_price - q1_price) / q1_price
         premium_dollars = q4_price - q1_price
         
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Q1 (Low) Avg Price", f"${q1_price:.0f}/day")
-        col2.metric("Q4 (High) Avg Price", f"${q4_price:.0f}/day")
-        col3.metric("Premium", f"{premium_pct:.1%} (${premium_dollars:.0f})")
+        # Create two-column layout: Chart + Details
+        col_chart, col_details = st.columns([2, 1])
         
-        # Chart
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=regime_prices['disp_quartile'],
-            y=regime_prices['mean'],
-            marker_color=['#dc3545', '#ff9800', '#90ee90', '#28a745'],
-            text=[f"${v:.0f}" for v in regime_prices['mean']],
-            textposition='outside'
-        ))
-        fig.update_layout(
-            title="Average 5TC Price by Dispersion Quartile",
-            xaxis_title="Dispersion Regime",
-            yaxis_title="Average 5TC Price ($/day)",
-            height=400,
-            showlegend=False
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        with col_chart:
+            # Enhanced chart with error bars
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                x=regime_prices['disp_quartile'],
+                y=regime_prices['mean'],
+                marker_color=['#dc3545', '#ff9800', '#90ee90', '#28a745'],
+                text=[f"${v:.0f}" for v in regime_prices['mean']],
+                textposition='outside',
+                error_y=dict(
+                    type='data',
+                    array=regime_prices['std'],
+                    visible=True,
+                    color='gray'
+                ),
+                hovertemplate='<b>%{x}</b><br>Mean: $%{y:.0f}<br>Std Dev: %{error_y.array:.0f}<extra></extra>'
+            ))
+            fig.update_layout(
+                title="Average 5TC Price by Dispersion Quartile",
+                xaxis_title="Dispersion Regime",
+                yaxis_title="Average 5TC Price ($/day)",
+                height=400,
+                showlegend=False
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col_details:
+            st.markdown("**📋 Regime Statistics:**")
+            for _, row in regime_prices.iterrows():
+                quartile = row['disp_quartile']
+                mean_price = row['mean']
+                count = row['count']
+                std = row['std']
+                
+                st.markdown(f"**{quartile}**")
+                st.metric("Avg Price", f"${mean_price:.0f}/day", delta=f"σ=${std:.0f}")
+                st.caption(f"{count:,} observations ({100*count/len(signals_df):.1f}%)")
+                st.markdown("---")
         
         st.success(
-            f"**Key Observation**:\n\n"
-            f"Prices are monotonically higher when "
-            f"dispersion is better. Q4 commands a {premium_pct:.1%} premium "
-            f"vs Q1. This is a structural market difference, not noise."
+            f"**Economic Interpretation:** Prices increase monotonically with dispersion. "
+            f"Q4 (high dispersion) commands a **{premium_pct:.1%} premium** (${premium_dollars:.0f}/day) "
+            f"over Q1 (low dispersion). This is a structural market feature reflecting better "
+            f"vessel positioning and stronger demand conditions."
         )
     
     st.markdown("---")
     
-    # Lag Sensitivity Analysis
-    st.subheader("4️⃣ Signal Lag Sensitivity Analysis")
+    # ========================================================================
+    # SECTION 3: LAG OPTIMIZATION
+    # ========================================================================
+    
+    st.header("⏱️ Signal Lag Optimization")
     
     st.info(
-        "**Question**: Is it better to act immediately on the signal, or wait 1-3 days?\n\n"
-        "If dispersion is truly *predictive*, a lag might improve performance by:\n"
-        "- Filtering out noise and false signals\n"
-        "- Capturing only persistent dispersion shifts\n"
-        "- Allowing confirmation time before entering positions\n\n"
-        f"**Current setting**: {signal_lag}-day lag"
+        f"**Question:** Does dispersion lead prices, or is the relationship contemporaneous?\n\n"
+        f"Testing lags 0-20 days to find optimal predictive horizon. "
+        f"**Current setting:** {signal_lag}-day lag | "
+        f"**Hypothesis:** Forward contracts may respond with 1-3 week delay due to negotiation time."
     )
     
-    with st.spinner("Testing different lags..."):
+    # User control for test range
+    col_test1, col_test2 = st.columns([1, 3])
+    with col_test1:
+        max_test_lag = st.selectbox(
+            "Test up to:",
+            options=[5, 10, 14, 20],
+            index=3,
+            help="Balance between thoroughness and computation time"
+        )
+    
+    with st.spinner(f"Testing lags 0-{max_test_lag} days..."):
         lag_results = []
         
-        for test_lag in range(0, 6):
+        for test_lag in range(0, max_test_lag + 1):
             sg_test = SignalGenerator(clean_data, signal_lag=test_lag)
             signals_test = sg_test.get_signals_dataframe()
             
@@ -1169,91 +1295,154 @@ elif tab_choice == "📈 Economic Analysis":
             results_test = engine_test.backtest_strategy('signal_momentum', f'Momentum_Lag{test_lag}')
             
             lag_results.append({
-                'Lag (days)': test_lag,
-                'Sharpe Ratio': results_test['sharpe_ratio'],
-                'Total Return': results_test['total_return_pct'],
+                'Lag': test_lag,
+                'Sharpe': results_test['sharpe_ratio'],
+                'Return': results_test['total_return_pct'],
                 'Max DD': results_test['max_drawdown_pct'],
                 'Win Rate': results_test['win_rate'],
-                'Num Trades': results_test['num_trades'],
-                'Calmar': results_test['calmar_ratio']
+                'Trades': results_test['num_trades']
             })
     
     lag_df = pd.DataFrame(lag_results)
     
-    # Display table
-    st.dataframe(
-        lag_df.style.format({
-            'Sharpe Ratio': '{:.3f}',
-            'Total Return': '{:.2%}',
-            'Max DD': '{:.2%}',
-            'Win Rate': '{:.2%}',
-            'Calmar': '{:.2f}',
-            'Num Trades': '{:.0f}'
-        }).background_gradient(subset=['Sharpe Ratio'], cmap='RdYlGn', vmin=-0.5, vmax=1.0),
-        use_container_width=True,
-        hide_index=True
-    )
+    # Find optimal lag
+    best_lag_idx = lag_df['Sharpe'].idxmax()
+    best_lag = lag_df.loc[best_lag_idx, 'Lag']
+    best_sharpe = lag_df.loc[best_lag_idx, 'Sharpe']
+    worst_sharpe = lag_df['Sharpe'].min()
     
-    # Chart: Sharpe ratio by lag
-    fig_lag = go.Figure()
-    fig_lag.add_trace(go.Scatter(
-        x=lag_df['Lag (days)'],
-        y=lag_df['Sharpe Ratio'],
-        mode='lines+markers',
-        marker=dict(size=10, color=lag_df['Sharpe Ratio'], colorscale='RdYlGn', showscale=True),
-        line=dict(width=2, color='blue'),
-        text=[f"Lag {x}: {y:.3f}" for x, y in zip(lag_df['Lag (days)'], lag_df['Sharpe Ratio'])],
-        hovertemplate='<b>Lag %{x} days</b><br>Sharpe: %{y:.3f}<extra></extra>'
-    ))
-    fig_lag.update_layout(
-        title="Sharpe Ratio vs Signal Lag",
-        xaxis_title="Signal Lag (days)",
-        yaxis_title="Sharpe Ratio",
-        height=400,
-        hovermode='x unified'
-    )
-    st.plotly_chart(fig_lag, use_container_width=True)
+    # Display key findings at top
+    col_opt1, col_opt2, col_opt3, col_opt4 = st.columns(4)
+    with col_opt1:
+        st.metric("🎯 Optimal Lag", f"{int(best_lag)} days", delta=f"Sharpe: {best_sharpe:.3f}")
+    with col_opt2:
+        improvement = best_sharpe - lag_df.loc[0, 'Sharpe']
+        st.metric("📈 vs Immediate", f"{improvement:+.3f}", delta="Sharpe improvement")
+    with col_opt3:
+        sharpe_range = best_sharpe - worst_sharpe
+        st.metric("📊 Sharpe Range", f"{sharpe_range:.3f}", delta=f"{worst_sharpe:.3f} to {best_sharpe:.3f}")
+    with col_opt4:
+        optimal_return = lag_df.loc[best_lag_idx, 'Return']
+        st.metric("💰 Best Return", f"{optimal_return:.1%}", delta=f"at {int(best_lag)}-day lag")
     
-    # Best lag analysis
-    best_lag_idx = lag_df['Sharpe Ratio'].idxmax()
-    best_lag = lag_df.loc[best_lag_idx, 'Lag (days)']
-    best_sharpe = lag_df.loc[best_lag_idx, 'Sharpe Ratio']
+    # Visualization: Sharpe by lag
+    col_chart, col_table = st.columns([2, 1])
     
+    with col_chart:
+        fig_lag = go.Figure()
+        
+        # Line + markers with color gradient
+        fig_lag.add_trace(go.Scatter(
+            x=lag_df['Lag'],
+            y=lag_df['Sharpe'],
+            mode='lines+markers',
+            marker=dict(
+                size=10,
+                color=lag_df['Sharpe'],
+                colorscale='RdYlGn',
+                showscale=True,
+                colorbar=dict(title="Sharpe")
+            ),
+            line=dict(width=2, color='lightblue'),
+            hovertemplate='<b>Lag %{x} days</b><br>Sharpe: %{y:.3f}<br>Return: ' + 
+                          lag_df['Return'].apply(lambda x: f"{x:.2%}").tolist()[0] + '<extra></extra>'
+        ))
+        
+        # Highlight optimal
+        fig_lag.add_trace(go.Scatter(
+            x=[best_lag],
+            y=[best_sharpe],
+            mode='markers',
+            marker=dict(size=20, color='gold', symbol='star', line=dict(width=2, color='red')),
+            name='Optimal',
+            hovertemplate='<b>⭐ OPTIMAL</b><br>Lag: %{x} days<br>Sharpe: %{y:.3f}<extra></extra>'
+        ))
+        
+        fig_lag.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
+        fig_lag.update_layout(
+            title=f"Performance by Signal Lag (0-{max_test_lag} days)",
+            xaxis_title="Signal Lag (days)",
+            yaxis_title="Sharpe Ratio",
+            height=400,
+            hovermode='x unified',
+            showlegend=False
+        )
+        st.plotly_chart(fig_lag, use_container_width=True)
+    
+    with col_table:
+        st.markdown("**📊 Top 5 Lags:**")
+        top_5 = lag_df.nlargest(5, 'Sharpe')[['Lag', 'Sharpe', 'Return']].copy()
+        top_5['Lag'] = top_5['Lag'].astype(int).astype(str) + ' days'
+        top_5['Sharpe'] = top_5['Sharpe'].apply(lambda x: f"{x:.3f}")
+        top_5['Return'] = top_5['Return'].apply(lambda x: f"{x:.1%}")
+        st.dataframe(top_5, use_container_width=True, hide_index=True)
+    
+    # Interpretation
     if best_lag == 0:
         st.success(
-            f"✅ **Optimal Lag: {best_lag} days (immediate entry)**\n\n"
-            f"Sharpe Ratio: {best_sharpe:.3f}\n\n"
-            f"The signal works best when acted upon immediately. "
-            f"Waiting reduces performance, suggesting the signal captures short-term momentum."
+            f"✅ **Finding: Contemporaneous Relationship**\n\n"
+            f"Optimal lag is **0 days** (Sharpe: {best_sharpe:.3f}). The signal works best with immediate entry, "
+            f"suggesting dispersion and prices move together rather than in a lead-lag relationship. "
+            f"This indicates dispersion is a **coincident indicator**, not a leading one."
+        )
+    elif best_lag <= 3:
+        st.success(
+            f"✅ **Finding: Short-Term Predictive Power**\n\n"
+            f"Optimal lag is **{int(best_lag)} days** (Sharpe: {best_sharpe:.3f}). "
+            f"Brief delay improves performance, suggesting dispersion momentum has {int(best_lag)}-day predictive power. "
+            f"This could reflect information diffusion or contract negotiation lags in spot/near-term markets."
         )
     else:
-        improvement = ((best_sharpe - lag_df.loc[0, 'Sharpe Ratio']) / 
-                      abs(lag_df.loc[0, 'Sharpe Ratio'])) if lag_df.loc[0, 'Sharpe Ratio'] != 0 else 0
         st.success(
-            f"✅ **Optimal Lag: {int(best_lag)} days**\n\n"
-            f"Sharpe Ratio: {best_sharpe:.3f} ({improvement:+.1%} vs immediate entry)\n\n"
-            f"Waiting {int(best_lag)} day(s) improves performance, suggesting dispersion changes "
-            f"are truly predictive and not just noise. The lag allows confirmation."
+            f"✅ **Finding: Forward Contract Dynamics**\n\n"
+            f"Optimal lag is **{int(best_lag)} days** (Sharpe: {best_sharpe:.3f}). "
+            f"Longer lag suggests dispersion changes predict forward prices with ~{int(best_lag)}-day horizon, "
+            f"consistent with vessel repositioning time and forward contract negotiation periods. "
+            f"This supports the hypothesis that fleet positioning precedes forward curve adjustments."
+        )
+    
+    with st.expander("📋 View Full Results Table"):
+        display_lag_df = lag_df.copy()
+        display_lag_df['Lag'] = display_lag_df['Lag'].astype(int)
+        st.dataframe(
+            display_lag_df.style.format({
+                'Sharpe': '{:.3f}',
+                'Return': '{:.2%}',
+                'Max DD': '{:.2%}',
+                'Win Rate': '{:.2%}',
+                'Trades': '{:.0f}'
+            }).background_gradient(subset=['Sharpe'], cmap='RdYlGn', vmin=-0.5, vmax=1.0),
+            use_container_width=True,
+            hide_index=True
         )
     
     st.markdown("---")
     
-    # Limitations
-    st.subheader("5️⃣ Risks & Limitations")
+    # ========================================================================
+    # SECTION 4: RISK FACTORS
+    # ========================================================================
     
-    st.warning(
-        "⚠️ **This signal is NOT perfect:**\n\n"
-        "• **Correlation ≠ Causation**: Dispersion and prices rise together "
-        "because both respond to demand. Dispersion does not directly cause "
-        "prices.\n\n"
-        "• **Changing Relationship**: The correlation varies over time. "
-        "It can break without warning.\n\n"
-        "• **Omitted Factors**: Interest rates, iron prices, geopolitics... "
-        "affect prices much more than dispersion.\n\n"
-        "• **In-Sample Bias**: These results use the same data "
-        "we used to build the signal.\n\n"
-        "• **Real Fees**: Fees quickly degrade performance."
-    )
+    st.header("⚠️ Key Risk Factors")
+    
+    col_risk1, col_risk2 = st.columns(2)
+    
+    with col_risk1:
+        st.markdown("**🔴 Critical Limitations:**")
+        st.warning(
+            "• **Weak Correlation (r=0.27):** Only 7% of price variance explained\n\n"
+            "• **Non-Stationary:** Relationship changes over time/regimes\n\n"
+            "• **In-Sample Bias:** Optimized on historical data\n\n"
+            "• **Fee Sensitivity:** Edge degrades quickly with transaction costs"
+        )
+    
+    with col_risk2:
+        st.markdown("**🟡 Usage Recommendations:**")
+        st.info(
+            "✅ **Use as confirmation signal** in multi-factor framework\n\n"
+            "✅ **Combine with fundamentals** (iron ore prices, PMI, rates)\n\n"
+            "✅ **Monitor regime changes** (correlation can flip)\n\n"
+            "✅ **Keep fees realistic** (10-20 bps for institutional trading)"
+        )
 
 
 

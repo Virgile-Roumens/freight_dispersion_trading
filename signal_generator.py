@@ -33,7 +33,7 @@ class SignalGenerator:
         
         Args:
             clean_data: Output from DataManager.get_clean_data()
-            signal_lag: Number of days to wait before acting on signal (0-14)
+            signal_lag: Number of days to wait before acting on signal (0-20)
         """
         self.data = clean_data.copy()
         self.features = None
