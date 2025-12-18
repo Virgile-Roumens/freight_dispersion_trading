@@ -260,6 +260,14 @@ class BacktestEngine:
         daily_returns = np.diff(equity_arr) / equity_arr[:-1]
         daily_rf_rate = (self.risk_free_rate if self.risk_free_rate else 0.02) / 252
         excess_returns = daily_returns - daily_rf_rate
+        
+        # Annualized volatility
+        annualized_volatility = (
+            np.std(daily_returns) * np.sqrt(252)
+            if len(daily_returns) > 0
+            else 0
+        )
+        
         sharpe = (
             (np.mean(excess_returns) / np.std(excess_returns)) * np.sqrt(252)
             if len(excess_returns) > 0 and np.std(excess_returns) > 0
@@ -275,6 +283,7 @@ class BacktestEngine:
             'strategy_name': strategy_name,
             'total_return_pct': total_return_pct,
             'annualized_return_pct': annualized_return_pct,
+            'annualized_volatility': annualized_volatility,
             'total_pnl': total_pnl,
             'sharpe_ratio': sharpe,
             'risk_free_rate': self.risk_free_rate if self.risk_free_rate else 0.02,
@@ -302,6 +311,7 @@ class BacktestEngine:
         print(f"Annualized Return: {self.results['annualized_return_pct']:.1%}")
         print(f"Sharpe Ratio:      {self.results['sharpe_ratio']:.2f} "
               f"(RF Rate: {self.results['risk_free_rate']:.2%})")
+        print(f"Annualized Volatility: {self.results['annualized_volatility']:.1%}")
         print(f"Max Drawdown:      {self.results['max_drawdown_pct']:.1%}")
         print(f"Win Rate:          {self.results['win_rate']:.1%} "
               f"({self.results['winning_trades']}/{self.results['num_trades']})")
@@ -391,6 +401,7 @@ class BacktestEngine:
                 '',
                 'Total Return (%)',
                 'Annualized Return (%)',
+                'Annualized Volatility (%)',
                 'Total P&L ($)',
                 'Sharpe Ratio',
                 'Risk-Free Rate (10Y Treasury %)',
@@ -413,6 +424,7 @@ class BacktestEngine:
                 '',
                 f"{self.results.get('total_return_pct', 0):.2%}",
                 f"{self.results.get('annualized_return_pct', 0):.2%}",
+                f"{self.results.get('annualized_volatility', 0):.2%}",
                 f"{self.results.get('total_pnl', 0):,.2f}",
                 f"{self.results.get('sharpe_ratio', 0):.3f}",
                 f"{self.results.get('risk_free_rate', 0.02):.2%}",

@@ -1295,6 +1295,7 @@ elif tab_choice == "⚡ Strategy & Performance":
         # Key Performance Indicators
         st.subheader("📈 Key Performance Indicators")
         
+        # First row: Main metrics
         metric_cols = st.columns(5)
         
         with metric_cols[0]:
@@ -1331,6 +1332,23 @@ elif tab_choice == "⚡ Strategy & Performance":
                 "Win Rate",
                 f"{results['win_rate']:.1%}",
                 f"{results['winning_trades']}/{results['num_trades']}"
+            )
+        
+        # Second row: Additional risk metrics
+        metric_cols2 = st.columns([1, 1, 3])
+        
+        with metric_cols2[0]:
+            st.metric(
+                "Annualized Volatility",
+                f"{results['annualized_volatility']:.1%}",
+                "Annual std dev"
+            )
+        
+        with metric_cols2[1]:
+            st.metric(
+                "Total Fees Paid",
+                f"${results['total_fees_paid']:,.0f}",
+                "Transaction costs"
             )
         
         # Performance interpretation
