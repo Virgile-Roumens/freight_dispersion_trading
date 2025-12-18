@@ -101,8 +101,6 @@ freight_project/
 │
 ├── requirements.txt                # Python dependencies
 ├── README.md                       # This file
-├── ENGELHART_DESIGN_SYSTEM.md      # Brand guidelines
-└── PERFORMANCE_METRICS_UPGRADE.md  # Metrics documentation
 ```
 
 ---
