@@ -1219,11 +1219,11 @@ elif tab_choice == "⚡ Strategy & Performance":
         
         with col_protect2:
             st.markdown("**2️⃣ Volatility Filter**")
-            st.info("Blocks trading when |price z-score| > **2.0σ** (extreme volatility)")
+            st.info("Blocks trading when |price z-score| > **2.0σ** (extreme volatility on the FFA price)")
         
         with col_protect3:
             st.markdown("**3️⃣ Regime Detection**")
-            st.info("Avoids trading in low-volatility regimes (90-day lookback)")
+            st.info("Avoids trading in low-volatility regimes (90-day lookback dispersion vol > **0.5σ**)")
         
         st.success(
             f"**🎯 Bottom Line:** {exp['rationale']}"
