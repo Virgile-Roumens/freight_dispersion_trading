@@ -164,31 +164,6 @@ else: position = 0%  # Flat
 
 **Rationale:** High dispersion = vessels well-positioned globally → bullish freight rates
 
----
-
-## 🎨 Engelhart Brand Identity
-
-### Color Palette
-
-- **Primary Navy**: #132c68 (RGB: 19, 44, 104) - Headers, primary elements
-- **Gold**: #f4c430 (RGB: 244, 196, 48) - Accents, highlights
-- **Teal**: #5eb8e8 (RGB: 94, 184, 232) - Secondary data, info boxes
-
-### Brand Values
-
-- **Be Bold** - Confident analysis, strong visual identity
-- **Be Collaborative** - Transparent data, clear communication
-- **Be Proactive** - Actionable insights, forward-looking analytics
-
-### Design Philosophy
-
-Professional trading desk aesthetic inspired by Bloomberg Terminal, with:
-- Gradient backgrounds
-- Professional shadows and depth
-- Clear visual hierarchy
-- Institutional typography
-
----
 
 ## 📊 Data Sources
 
@@ -343,36 +318,3 @@ The platform automatically validates:
 For questions, issues, or feature requests:
 
 - **Primary Contact**: Virgile ROUMENS
-- **Organization**: Engelhart Commodities Trading
-- **Department**: Freight Trading Desk
-
----
-
-## 📄 License
-
-**Proprietary - Engelhart Commodities Trading**
-
-This software is the property of Engelhart Commodities Trading and is intended for internal use only. Unauthorized distribution, modification, or commercial use is prohibited.
-
----
-
-## 🏆 Credits
-
-**Developed for Engelhart Commodities Trading**
-
-- **Strategy Design**: Freight Trading Desk
-- **Quantitative Analysis**: Advanced statistical methods, institutional metrics
-- **Brand Integration**: Engelhart Design System
-- **Data Sources**: FFA market data, vessel positioning intelligence
-
----
-
-<div align="center">
-
-**⚓ ENGELHART COMMODITIES TRADING**
-
-*Where the Future Trades*
-
-🌊 **Be Bold • Be Collaborative • Be Proactive** 🌊
-
-</div>
