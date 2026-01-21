@@ -36,24 +36,24 @@ from backtest_engine import BacktestEngine
 # ============================================================================
 
 st.set_page_config(
-    page_title="Engelhart Freight Analytics | Capesize Intelligence",
+    page_title="Freight Analytics | Capesize Intelligence",
     page_icon="⚓",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
-        'About': "Engelhart Commodities Trading - Freight Analytics Platform. Where the Future Trades."
+        'About': "Freight Analytics Platform - Professional Trading Intelligence"
     }
 )
 
-# Engelhart Brand Styling
+# Brand Styling
 st.markdown("""
 <style>
-    /* Engelhart Brand Colors */
+    /* Brand Colors */
     :root {
-        --engelhart-navy: #132c68;
-        --engelhart-gold: #f4c430;
-        --engelhart-teal: #5eb8e8;
-        --engelhart-light-blue: #4a90e2;
+        --brand-navy: #132c68;
+        --brand-gold: #f4c430;
+        --brand-teal: #5eb8e8;
+        --brand-light-blue: #4a90e2;
     }
     
     /* Main Container */
@@ -242,15 +242,15 @@ def load_data_once():
 
 
 # ============================================================================
-# ENGELHART BRANDED HEADER
+# BRANDED HEADER
 # ============================================================================
 
-# Main page header with Engelhart branding
+# Main page header with branding
 col_logo, col_title = st.columns([1, 4])
 
 with col_logo:
     try:
-        st.image('assets/engelhart_logo.png', width=120)
+        st.image('assets/logo.jpg', width=120)
     except:
         st.markdown("<div style='height: 100px;'></div>", unsafe_allow_html=True)  # Spacer if no logo
 
@@ -258,8 +258,8 @@ with col_title:
     st.markdown("""
     <div style='padding: 0;'>
         <h1 style='color: #132c68; margin: 0; font-size: 2.5rem; font-weight: 700;'>⚓ Capesize Freight Analytics</h1>
-        <p style='color: #132c68; font-size: 1.2rem; margin: 0.3rem 0 0 0; font-weight: 600; letter-spacing: 1px;'>ENGELHART COMMODITIES TRADING</p>
-        <p style='color: #5eb8e8; font-size: 0.95rem; margin: 0.3rem 0 0 0; font-style: italic;'>Where the Future Trades • Be Bold • Be Collaborative • Be Proactive</p>
+        <p style='color: #132c68; font-size: 1.2rem; margin: 0.3rem 0 0 0; font-weight: 600; letter-spacing: 1px;'>FREIGHT INTELLIGENCE PLATFORM</p>
+        <p style='color: #5eb8e8; font-size: 0.95rem; margin: 0.3rem 0 0 0; font-style: italic;'>Professional Trading Intelligence • Data-Driven Insights</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -271,7 +271,7 @@ st.markdown("<hr style='margin: 1.5rem 0; border: none; border-top: 3px solid #f
 
 # Sidebar logo
 try:
-    st.sidebar.image('assets/engelhart_logo.png', use_container_width=True)
+    st.sidebar.image('assets/logo.jpg', use_container_width=True)
 except:
     pass  # Logo not found, continue without it
 
@@ -1973,11 +1973,11 @@ elif tab_choice == "📈 Optimization & Analysis":
 st.markdown("<hr style='border: 2px solid #132c68; margin: 2rem 0 1rem 0;'>", unsafe_allow_html=True)
 st.markdown("""
 <div style='text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px; border: 2px solid #132c68;'>
-    <p style='color: #132c68; font-weight: 700; font-size: 1.2rem; margin: 0;'>⚓ ENGELHART COMMODITIES TRADING</p>
-    <p style='color: #5eb8e8; margin: 0.5rem 0; font-size: 0.95rem;'>Freight Analytics Platform • Capesize Dispersion Intelligence • 2016-2025</p>
+    <p style='color: #132c68; font-weight: 700; font-size: 1.2rem; margin: 0;'>⚓ FREIGHT ANALYTICS PLATFORM</p>
+    <p style='color: #5eb8e8; margin: 0.5rem 0; font-size: 0.95rem;'>Capesize Dispersion Intelligence • Professional Trading Tools • 2016-2025</p>
     <p style='color: #6c757d; margin: 0.5rem 0 0 0; font-size: 0.85rem; font-style: italic;'>
     <p style='color: #f4c430; margin: 0.75rem 0 0 0; font-size: 0.9rem; font-weight: 600;'>
-    Where the Future Trades
+    Data-Driven Market Intelligence
     </p>
 </div>
 """, unsafe_allow_html=True)

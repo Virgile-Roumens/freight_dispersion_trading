@@ -1,20 +1,20 @@
-# ⚓ Engelhart Freight Analytics Platform
+# ⚓ Freight Analytics Platform
 
 **Capesize Dispersion Intelligence & 5TC Price Prediction Engine**
 
-A professional-grade quantitative trading tool for freight market analysis, built for Engelhart Commodities Trading's freight desk. This platform combines vessel positioning data with forward freight pricing to generate momentum-based trading signals with institutional-quality performance metrics.
+A professional-grade quantitative trading tool for freight market analysis. This platform combines vessel positioning data with forward freight pricing to generate momentum-based trading signals with institutional-quality performance metrics.
 
 ---
 
 ## 🎯 Overview
 
-The Engelhart Freight Analytics Platform analyzes the relationship between Capesize vessel dispersion patterns and 5TC Forward Freight Agreement (FFA) prices. Using advanced statistical methods and quantitative backtesting, it provides:
+The Freight Analytics Platform analyzes the relationship between Capesize vessel dispersion patterns and 5TC Forward Freight Agreement (FFA) prices. Using advanced statistical methods and quantitative backtesting, it provides:
 
 - **Multi-threshold momentum signals** based on vessel positioning
 - **Institutional-grade performance metrics** (Sharpe ratio with dynamic risk-free rate, annualized returns)
 - **Comprehensive market intelligence** (correlation analysis, Granger causality tests, regime detection)
 - **Interactive optimization tools** (lag testing, fee sensitivity, parameter tuning)
-- **Professional Engelhart branding** (navy #132c68, gold #f4c430, teal #5eb8e8)
+- **Professional interface design** (navy #132c68, gold #f4c430, teal #5eb8e8)
 
 ---
 
@@ -41,8 +41,6 @@ freight_project/
 ├── data/
 │   ├── cape_front_month.csv
 │   └── dispersion_case_study.csv
-├── assets/
-│   └── engelhart_logo.png
 ```
 
 4. **Launch the application**
@@ -90,7 +88,6 @@ freight_project/
 │   └── dispersion_case_study.csv   # Vessel dispersion data
 │
 ├── assets/                         # Visual assets
-│   └── engelhart_logo.png          # Company logo
 │
 ├── export/                         # Backtest exports (auto-created)
 │
@@ -302,7 +299,6 @@ The platform automatically validates:
 ## 📚 Documentation
 
 - **README.md** - This file (overview, installation, usage)
-- **ENGELHART_DESIGN_SYSTEM.md** - Complete brand guidelines (6,000+ words)
 - **PERFORMANCE_METRICS_UPGRADE.md** - FRED API integration details
 - **ARCHITECTURE_QUICK_REF.py** - Code architecture reference
 
