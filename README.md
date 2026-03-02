@@ -11,7 +11,7 @@ A professional-grade quantitative trading tool for freight market analysis. This
 The Freight Analytics Platform analyzes the relationship between Capesize vessel dispersion patterns and 5TC Forward Freight Agreement (FFA) prices. Using advanced statistical methods and quantitative backtesting, it provides:
 
 - **Dual trading signals** — Inverted Momentum + Mean Reversion (accordion effect)
-- **Corrected economic logic** — HIGH dispersion = BEARISH, LOW dispersion = BULLISH
+- **Economic logic** — HIGH dispersion = BEARISH, LOW dispersion = BULLISH
 - **Lead-lag cross-correlation analysis** — Is dispersion a leading or lagging indicator?
 - **Institutional-grade performance metrics** (Sharpe ratio with dynamic risk-free rate, annualized returns)
 - **Comprehensive market intelligence** (correlation analysis, Granger causality tests, regime detection)
@@ -28,7 +28,6 @@ The Freight Analytics Platform analyzes the relationship between Capesize vessel
 | **HIGH** (rising) | Fleet well spread globally | Efficient supply, cargo easily matched | **BEARISH** — prices fall |
 | **LOW** (falling) | Fleet concentrated regionally | Scarcity in key loading areas | **BULLISH** — prices rise |
 
-> This inverts the naive intuition. The platform applies this corrected logic across both signals.
 
 ---
 
@@ -76,7 +75,7 @@ The app will open automatically in your browser at `http://localhost:8501`
 - Regime analysis by dispersion quartiles
 
 ### 2. **Signal Explorer** (🎯 Tab)
-- **Two complementary signals** with corrected economic logic:
+- **Two complementary signals**:
   - **Inverted Momentum** — Trades short-term directional changes (60-day z-score window)
   - **Mean Reversion** — Fades extreme deviations from 120-day equilibrium (accordion effect)
 - Toggle to overlay both signals on the price chart
@@ -294,7 +293,7 @@ The platform automatically validates:
 ### For Analysts
 
 1. **Rolling correlation** — Identify periods when strategy works/fails
-2. **Quartile analysis** — Validate economic intuition (high disp = *lower* rates, corrected logic)
+2. **Quartile analysis** — Validate economic intuition (high disp = *lower* rates)
 3. **Lead-lag tab** — Check if dispersion is a leading or lagging indicator for your chosen series pair
 4. **Compare Both strategies** — Evaluate momentum vs mean reversion side-by-side
 5. **Trade log analysis** — Understand win/loss patterns
