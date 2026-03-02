@@ -3,9 +3,10 @@ Streamlit Dashboard - User-Friendly Interface for Dispersion Analysis
 
 Tabs:
 1. 📊 Data Overview - Correlations, quality, statistical tests
-2. 🎯 Signal Explorer - Momentum signal explanation
-3. 🏬 Backtest Results - Performance, P&L
+2. 🎯 Signal Explorer - Momentum + Mean Reversion signals
+3. 🏬 Backtest Results - Performance, P&L, strategy comparison
 4. 📈 Economic Analysis - In-depth statistics
+5. 🔬 Lead-Lag Analysis - Cross-correlation diagnostic
 
 UX Architecture:
 - Lots of st.info() for explanations
@@ -23,6 +24,7 @@ from plotly.subplots import make_subplots
 from datetime import datetime
 from pathlib import Path
 import sys
+import glob
 
 # Import classes
 sys.path.insert(0, str(Path(__file__).parent))
@@ -45,184 +47,133 @@ st.set_page_config(
     }
 )
 
-# Brand Styling
+# Brand Styling — enhanced with better spacing, card styling, animations
 st.markdown("""
 <style>
-    /* Brand Colors */
     :root {
         --brand-navy: #132c68;
         --brand-gold: #f4c430;
         --brand-teal: #5eb8e8;
         --brand-light-blue: #4a90e2;
+        --brand-dark: #0d1f4a;
+        --card-shadow: 0 2px 12px rgba(19, 44, 104, 0.08);
     }
-    
-    /* Main Container */
-    .main {
-        padding: 0rem 0rem;
-        background-color: #f8f9fa;
-    }
-    
+
+    /* Global */
+    .main { padding: 0rem 0rem; background-color: #f5f7fb; }
+    section[data-testid="stSidebar"] > div { padding-top: 1rem; }
+
     /* Headers */
-    h1 {
-        color: #132c68;
-        font-size: 2.8rem;
-        font-weight: 700;
-        letter-spacing: -0.5px;
-        margin-bottom: 0.5rem;
-    }
-    h2 {
-        color: #132c68;
-        font-size: 2rem;
-        font-weight: 600;
-        border-bottom: 3px solid #f4c430;
-        padding-bottom: 0.5rem;
-        margin-top: 1.5rem;
-    }
-    h3 {
-        color: #132c68;
-        font-weight: 600;
-    }
-    
-    /* Sidebar Styling */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #132c68 0%, #1a3a7f 100%);
-    }
-    [data-testid="stSidebar"] .css-1d391kg, [data-testid="stSidebar"] .st-emotion-cache-1d391kg {
-        color: white;
-    }
-    [data-testid="stSidebar"] label {
-        color: white !important;
-        font-weight: 500;
-    }
-    [data-testid="stSidebar"] .stMarkdown {
-        color: white;
-    }
-    
-    /* Sidebar Radio Buttons - Aggressive white text enforcement */
-    [data-testid="stSidebar"] .stRadio > label {
-        color: white !important;
-        font-weight: 600;
-    }
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] label {
-        color: white !important;
-        font-weight: 500;
-    }
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] label span {
-        color: white !important;
-    }
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] label p {
-        color: white !important;
-    }
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] label div {
-        color: white !important;
-    }
-    [data-testid="stSidebar"] .stRadio * {
-        color: white !important;
-    }
-    
-    /* Info Boxes */
-    .stInfo {
-        background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%);
-        border-left: 5px solid #132c68;
-        border-radius: 8px;
-        padding: 1rem;
-        box-shadow: 0 2px 4px rgba(19, 44, 104, 0.1);
-    }
-    .stSuccess {
-        background: linear-gradient(135deg, #f0fff4 0%, #e6f9ea 100%);
-        border-left: 5px solid #28a745;
-        border-radius: 8px;
-        padding: 1rem;
-        box-shadow: 0 2px 4px rgba(40, 167, 69, 0.1);
-    }
-    .stWarning {
-        background: linear-gradient(135deg, #fffbf0 0%, #fff8e6 100%);
-        border-left: 5px solid #f4c430;
-        border-radius: 8px;
-        padding: 1rem;
-        box-shadow: 0 2px 4px rgba(244, 196, 48, 0.1);
-    }
-    .stError {
-        background: linear-gradient(135deg, #fff0f0 0%, #ffe6e6 100%);
-        border-left: 5px solid #dc3545;
-        border-radius: 8px;
-        padding: 1rem;
-    }
-    
+    h1 { color: #132c68; font-size: 2.6rem; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 0.3rem; }
+    h2 { color: #132c68; font-size: 1.8rem; font-weight: 600; border-bottom: 3px solid #f4c430;
+         padding-bottom: 0.5rem; margin-top: 1.5rem; }
+    h3 { color: #132c68; font-weight: 600; font-size: 1.2rem; }
+    h4 { color: #132c68; font-weight: 600; font-size: 1.05rem; margin-bottom: 0.2rem; }
+
+    /* Sidebar */
+    [data-testid="stSidebar"] { background: linear-gradient(180deg, #0d1f4a 0%, #132c68 40%, #1a3a7f 100%); }
+    [data-testid="stSidebar"] label { color: rgba(255,255,255,0.92) !important; font-weight: 500; font-size: 0.9rem; }
+    [data-testid="stSidebar"] .stMarkdown { color: rgba(255,255,255,0.88); }
+    [data-testid="stSidebar"] .stRadio label span { color: rgba(255,255,255,0.92) !important; }
+    [data-testid="stSidebar"] .stSlider label { color: rgba(255,255,255,0.92) !important; }
+    [data-testid="stSidebar"] hr { border-color: rgba(244,196,48,0.3); }
+
     /* Metrics */
-    [data-testid="stMetricValue"] {
-        color: #132c68;
-        font-size: 2rem;
-        font-weight: 700;
-    }
-    [data-testid="stMetricDelta"] {
-        font-weight: 600;
-    }
-    
+    [data-testid="stMetricValue"] { color: #132c68; font-size: 1.85rem; font-weight: 700; }
+    [data-testid="stMetricLabel"] { font-size: 0.82rem; color: #555; font-weight: 500; text-transform: uppercase;
+                                     letter-spacing: 0.3px; }
+
     /* Buttons */
     .stButton>button {
         background: linear-gradient(135deg, #132c68 0%, #1a3a7f 100%);
-        color: white;
-        border: none;
-        border-radius: 6px;
-        padding: 0.75rem 1.5rem;
-        font-weight: 600;
-        box-shadow: 0 4px 6px rgba(19, 44, 104, 0.2);
-        transition: all 0.3s ease;
+        color: white; border: none; border-radius: 8px;
+        padding: 0.7rem 1.5rem; font-weight: 600; font-size: 0.9rem;
+        box-shadow: 0 4px 12px rgba(19, 44, 104, 0.25);
+        transition: all 0.2s ease;
     }
     .stButton>button:hover {
-        background: linear-gradient(135deg, #1a3a7f 0%, #132c68 100%);
-        box-shadow: 0 6px 8px rgba(19, 44, 104, 0.3);
-        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(19, 44, 104, 0.35);
+        transform: translateY(-1px);
     }
-    
+
     /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: white;
-        border-radius: 8px;
-        padding: 0.5rem;
+        gap: 6px; background-color: white; border-radius: 10px;
+        padding: 0.4rem 0.5rem; box-shadow: var(--card-shadow);
     }
     .stTabs [data-baseweb="tab"] {
-        background-color: #f8f9fa;
-        color: #132c68;
-        border-radius: 6px;
-        padding: 0.75rem 1.5rem;
-        font-weight: 600;
-        border: 2px solid transparent;
+        background-color: #f0f2f6; color: #132c68; border-radius: 8px;
+        padding: 0.65rem 1.2rem; font-weight: 600; font-size: 0.88rem;
+        border: 1px solid transparent; transition: all 0.15s ease;
     }
+    .stTabs [data-baseweb="tab"]:hover { background-color: #e4e8f0; }
     .stTabs [aria-selected="true"] {
         background: linear-gradient(135deg, #132c68 0%, #1a3a7f 100%);
-        color: white;
-        border: 2px solid #f4c430;
+        color: white; border: 2px solid #f4c430;
+        box-shadow: 0 2px 8px rgba(19, 44, 104, 0.3);
     }
-    
-    /* Dataframes */
-    .stDataFrame {
-        border: 2px solid #132c68;
-        border-radius: 8px;
-        overflow: hidden;
-    }
-    
+
+    /* Info / Warning boxes */
+    .stAlert { border-radius: 10px; }
+
     /* Expanders */
-    .streamlit-expanderHeader {
-        background-color: #f8f9fa;
-        border: 2px solid #132c68;
-        border-radius: 6px;
-        color: #132c68;
-        font-weight: 600;
-    }
-    
-    /* Professional Cards */
+    .streamlit-expanderHeader { font-weight: 600; color: #132c68; font-size: 0.95rem; }
+
+    /* Dataframes */
+    .stDataFrame { border-radius: 8px; overflow: hidden; }
+
+    /* Custom card class */
     .metric-card {
-        background: white;
-        border-radius: 8px;
-        padding: 1.5rem;
-        box-shadow: 0 2px 8px rgba(19, 44, 104, 0.1);
-        border-top: 4px solid #132c68;
+        background: white; border-radius: 12px; padding: 1.2rem 1rem;
+        box-shadow: var(--card-shadow); border-left: 4px solid #f4c430;
+        margin-bottom: 0.5rem;
     }
+    .metric-card h4 { margin: 0 0 0.3rem 0; color: #132c68; font-size: 0.8rem;
+                       text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+    .metric-card .value { font-size: 1.8rem; font-weight: 700; color: #132c68; }
+    .metric-card .sub { font-size: 0.78rem; color: #888; margin-top: 0.15rem; }
+
+    /* Signal badge */
+    .signal-long { display: inline-block; background: #d4edda; color: #155724; padding: 0.25rem 0.75rem;
+                   border-radius: 20px; font-weight: 600; font-size: 0.85rem; }
+    .signal-short { display: inline-block; background: #f8d7da; color: #721c24; padding: 0.25rem 0.75rem;
+                    border-radius: 20px; font-weight: 600; font-size: 0.85rem; }
+    .signal-flat { display: inline-block; background: #e2e3e5; color: #383d41; padding: 0.25rem 0.75rem;
+                   border-radius: 20px; font-weight: 600; font-size: 0.85rem; }
+
+    /* Divider */
+    .gold-divider { margin: 1.5rem 0; border: none; border-top: 3px solid #f4c430; }
+
+    /* Footer */
+    .footer-text { text-align: center; color: #999; font-size: 0.75rem; padding: 2rem 0 1rem 0; }
 </style>
 """, unsafe_allow_html=True)
+
+
+# ============================================================================
+# HELPER: find logo in assets/
+# ============================================================================
+
+def find_logo(folder: str = "assets", keywords=("logo", "vessel", "ship", "boat")):
+    """Find the first image file in assets/ matching common logo names."""
+    asset_path = Path(folder)
+    if not asset_path.exists():
+        return None
+    for ext in ("png", "jpg", "jpeg", "svg", "webp"):
+        for f in asset_path.glob(f"*.{ext}"):
+            return str(f)
+    return None
+
+
+def signal_badge_html(val: float, label: str = "") -> str:
+    """Return HTML badge for a signal value."""
+    if val > 0:
+        pct = int(abs(val) * 100)
+        return f'<span class="signal-long">🟢 LONG {pct}%</span>'
+    elif val < 0:
+        pct = int(abs(val) * 100)
+        return f'<span class="signal-short">🔴 SHORT {pct}%</span>'
+    return '<span class="signal-flat">⚪ FLAT</span>'
 
 
 # ============================================================================
@@ -230,1754 +181,857 @@ st.markdown("""
 # ============================================================================
 
 @st.cache_resource
-def load_data_once():
-    """Load data once and cache it."""
+def load_data():
+    """Load and cache data."""
     dm = DataManager(
-        price_csv='data/cape_front_month.csv',
-        dispersion_csv='data/dispersion_case_study.csv'
+        price_csv="data/cape_front_month.csv",
+        dispersion_csv="data/dispersion_case_study.csv"
     )
-    clean_data = dm.get_clean_data(drop_na=True)
-    sg = SignalGenerator(clean_data)
-    return dm, sg, clean_data
+    return dm
+
+
+def get_signal_generator(clean_data, signal_lag, mr_threshold):
+    """Create SignalGenerator with current sidebar parameters."""
+    return SignalGenerator(clean_data, signal_lag=signal_lag, mr_threshold=mr_threshold)
 
 
 # ============================================================================
 # BRANDED HEADER
 # ============================================================================
 
-# Main page header with branding
-col_logo, col_title = st.columns([1, 4])
+logo_file = find_logo("assets")
 
-with col_logo:
-    try:
-        st.image('assets/logo.jpg', width=120)
-    except:
-        st.markdown("<div style='height: 100px;'></div>", unsafe_allow_html=True)  # Spacer if no logo
+header_col1, header_col2 = st.columns([1, 5])
+with header_col1:
+    if logo_file:
+        st.image(logo_file, width=110)
+    else:
+        st.markdown("<div style='font-size:4rem; text-align:center;'>⚓</div>", unsafe_allow_html=True)
 
-with col_title:
+with header_col2:
     st.markdown("""
-    <div style='padding: 0;'>
-        <h1 style='color: #132c68; margin: 0; font-size: 2.5rem; font-weight: 700;'>⚓ Capesize Freight Analytics</h1>
-        <p style='color: #132c68; font-size: 1.2rem; margin: 0.3rem 0 0 0; font-weight: 600; letter-spacing: 1px;'>FREIGHT INTELLIGENCE PLATFORM</p>
-        <p style='color: #5eb8e8; font-size: 0.95rem; margin: 0.3rem 0 0 0; font-style: italic;'>Professional Trading Intelligence • Data-Driven Insights</p>
+    <div style='padding: 0.5rem 0;'>
+        <h1 style='margin-bottom:0.1rem; font-size:2.5rem;'>Freight Analytics Platform</h1>
+        <p style='color:#5eb8e8; font-size:1.1rem; margin:0; font-weight:500;'>
+            Capesize Dispersion Intelligence · 5TC Price Prediction Engine
+        </p>
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown("<hr style='margin: 1.5rem 0; border: none; border-top: 3px solid #f4c430;'>", unsafe_allow_html=True)
+st.markdown("<hr class='gold-divider'>", unsafe_allow_html=True)
+
 
 # ============================================================================
-# SIDEBAR & NAVIGATION
+# SIDEBAR
 # ============================================================================
 
-# Sidebar logo
-try:
-    st.sidebar.image('assets/logo.jpg', use_container_width=True)
-except:
-    pass  # Logo not found, continue without it
+with st.sidebar:
+    # Sidebar logo
+    if logo_file:
+        st.image(logo_file, width=70)
 
-st.sidebar.markdown("""
-<div style='text-align: center; padding: 1rem 0; border-bottom: 2px solid #f4c430; margin-bottom: 1rem;'>
-    <h2 style='color: white; margin: 0; font-size: 1.8rem;'>🚢 FREIGHT ANALYTICS</h2>
-    <p style='color: #5eb8e8; margin: 0.5rem 0 0 0; font-size: 0.9rem;'>5TC Price Prediction Engine</p>
-</div>
-""", unsafe_allow_html=True)
+    st.markdown("""
+    <div style='text-align:center; padding:0.8rem 0 1rem 0; border-bottom:2px solid rgba(244,196,48,0.4);
+                margin-bottom:1rem;'>
+        <h2 style='color:white; margin:0; font-size:1.5rem; letter-spacing:-0.3px;'>🚢 FREIGHT ANALYTICS</h2>
+        <p style='color:#5eb8e8; margin:0.4rem 0 0 0; font-size:0.82rem;'>Capesize · 5TC FFA Intelligence</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-st.sidebar.markdown("""
-<div style='background: rgba(244, 196, 48, 0.1); border: 2px solid #f4c430; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;'>
-    <p style='color: white; margin: 0; font-weight: 600; font-size: 1.1rem;'>💡 ANALYTICAL FRAMEWORK</p>
-    <p style='color: #e0e0e0; margin: 0.5rem 0 0 0; font-size: 0.9rem;'>
-    Advanced quantitative analysis combining vessel dispersion patterns with forward freight pricing dynamics.
-    </p>
-    <hr style='border: 1px solid #f4c430; margin: 1rem 0;'>
-    <p style='color: #5eb8e8; margin: 0; font-size: 0.85rem;'>
-    ⚡ <b>Momentum-Based Signals</b><br>
-    📊 <b>Multi-Threshold Position Sizing</b><br>
-    🎯 <b>Risk-Adjusted Performance</b><br>
-    💼 <b>Institutional-Grade Metrics</b>
-    </p>
-</div>
-""", unsafe_allow_html=True)
+    # ── Signal parameters ──
+    st.markdown("#### ⚙️ Signal Parameters")
 
-st.sidebar.markdown("---")
+    signal_lag = st.slider(
+        "Signal Lag (days)",
+        min_value=0, max_value=20, value=0, step=1,
+        help="Delay signal execution by N days to test if dispersion leads prices."
+    )
 
-tab_choice = st.sidebar.radio(
-    "Navigation",
-    [
-        "📊 Data Overview",
-        "⚡ Strategy & Performance",
-        "📈 Optimization & Analysis"
-    ]
-)
+    mr_threshold = st.slider(
+        "Mean-Reversion Threshold (σ)",
+        min_value=0.5, max_value=2.5, value=1.0, step=0.25,
+        help="Minimum |z-score| vs 120d mean to trigger mean-reversion signal."
+    )
 
-st.sidebar.markdown("<hr style='border: 1px solid rgba(244, 196, 48, 0.3); margin: 1.5rem 0;'>", unsafe_allow_html=True)
-st.sidebar.markdown("<p style='color: #f4c430; font-weight: 700; font-size: 1.1rem; margin-bottom: 0.5rem;'>⚙️ SIGNAL PARAMETERS</p>", unsafe_allow_html=True)
+    strategy_choice = st.radio(
+        "Strategy to Backtest",
+        options=["Inverted Momentum", "Mean Reversion", "Compare Both"],
+        index=0,
+        help="Select which signal to evaluate in the Backtest tab."
+    )
 
-signal_lag = st.sidebar.slider(
-    "Signal Lag (days)",
-    min_value=0,
-    max_value=20,
-    value=0,
-    step=1,
-    help="Wait N days after signal before entering position (0 = immediate). Test if dispersion momentum leads prices by several days."
-)
+    st.markdown("---")
+    st.markdown("#### 💰 Backtest Settings")
 
-st.sidebar.markdown("<hr style='border: 1px solid rgba(244, 196, 48, 0.3); margin: 1.5rem 0;'>", unsafe_allow_html=True)
-st.sidebar.markdown("<p style='color: #f4c430; font-weight: 700; font-size: 1.1rem; margin-bottom: 0.5rem;'>💼 BACKTEST CONFIGURATION</p>", unsafe_allow_html=True)
+    initial_capital = st.number_input(
+        "Initial Capital ($)",
+        min_value=100_000, max_value=10_000_000, value=1_000_000, step=100_000,
+        help="Starting portfolio value."
+    )
 
-initial_capital = st.sidebar.number_input(
-    "Initial Capital ($)",
-    value=1_000_000,
-    step=100_000,
-    min_value=100_000,
-    help="Initial portfolio amount"
-)
+    transaction_fees_bps = st.slider(
+        "Transaction Fees (bps)",
+        min_value=0, max_value=50, value=10, step=1,
+        help="Round-trip cost per trade in basis points."
+    )
 
-fee_bps = st.sidebar.slider(
-    "Transaction Fees (bps)",
-    min_value=0,
-    max_value=50,
-    value=10,
-    step=1,
-    help="Basis points per trade (round-trip)"
-)
+    st.markdown("---")
+
+    # Current signal quick-view
+    st.markdown("#### 📡 Live Signal")
+
 
 # ============================================================================
-# DATA LOADING
+# LOAD DATA & COMPUTE SIGNALS
 # ============================================================================
 
-try:
-    dm, _, clean_data = load_data_once()
-    data_summary = dm.get_data_summary()
-    
-    # Generate signals with user-selected lag
-    sg = SignalGenerator(clean_data, signal_lag=signal_lag)
-    signals_df = sg.get_signals_dataframe()
-except Exception as e:
-    st.error(f"❌ Error loading data: {e}")
-    st.stop()
+dm = load_data()
+clean_data = dm.get_clean_data(drop_na=True)
+sg = get_signal_generator(clean_data, signal_lag, mr_threshold)
+signals_df = sg.get_signals_dataframe()
+
+# ── Sidebar live signal badges ──
+with st.sidebar:
+    if len(signals_df) > 0:
+        latest = signals_df.iloc[-1]
+        mom_val = latest.get('signal_momentum', 0)
+        mr_val = latest.get('signal_mean_reversion', 0)
+
+        st.markdown(
+            f"**Momentum:** {signal_badge_html(mom_val)}<br>"
+            f"**Mean Rev:** {signal_badge_html(mr_val)}<br>"
+            f"<span style='font-size:0.75rem; color:rgba(255,255,255,0.6);'>"
+            f"as of {latest['date'].strftime('%d %b %Y')}</span>",
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown("_No data loaded_")
+
+    st.markdown("---")
+    st.markdown(
+        "<p style='color:rgba(255,255,255,0.5); font-size:0.72rem; text-align:center; line-height:1.4;'>"
+        "✅ Corrected Economic Logic<br>"
+        "HIGH disp → Bearish · LOW disp → Bullish<br><br>"
+        "</p>",
+        unsafe_allow_html=True
+    )
+
+
+# ============================================================================
+# TABS
+# ============================================================================
+
+tab_overview, tab_signals, tab_backtest, tab_economics, tab_leadlag = st.tabs([
+    "📊  Data Overview",
+    "🎯  Signal Explorer",
+    "🏬  Backtest Results",
+    "📈  Economic Analysis",
+    "🔬  Lead-Lag Analysis",
+])
 
 
 # ============================================================================
 # TAB 1: DATA OVERVIEW
 # ============================================================================
 
-if tab_choice == "📊 Data Overview":
-    st.markdown("""
-    <div style='background: linear-gradient(135deg, #132c68 0%, #1a3a7f 100%); padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;'>
-        <h1 style='color: white; margin: 0;'>📊 Market Intelligence & Data Foundation</h1>
-        <p style='color: #f4c430; margin: 0.5rem 0 0 0; font-size: 1.1rem;'>Rigorous Statistical Analysis for Informed Trading Decisions</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div style='background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%); border-left: 5px solid #132c68; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;'>
-        <p style='color: #132c68; margin: 0; font-weight: 600; font-size: 1.05rem;'>🎯 <b>ANALYTICAL FRAMEWORK</b></p>
-        <p style='color: #495057; margin: 0.5rem 0 0 0;'>
-        Our quantitative approach combines institutional-grade statistical methods with freight market expertise:
-        </p>
-        <ul style='color: #495057; margin: 0.5rem 0 0 1.5rem;'>
-            <li><b>Data Characterization</b> - Comprehensive dataset profiling</li>
-            <li><b>Distribution Analytics</b> - Statistical behavior analysis</li>
-            <li><b>Correlation Dynamics</b> - Relationship pattern identification</li>
-            <li><b>Causality Testing</b> - Predictive power validation</li>
-            <li><b>Quality Assurance</b> - Data integrity verification</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # ========================================================================
-    # SECTION 1: DATA SUMMARY
-    # ========================================================================
-    
-    st.markdown("---")
-    st.header("1️⃣ Dataset Overview")
-    
-    # Key metrics
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric(
-            "Sample Size",
-            f"{data_summary['sample_size']:,} days"
-        )
-    with col2:
-        years = data_summary['years_covered']
-        st.metric(
-            "Period",
-            f"{years:.1f} years",
-            f"{data_summary['date_start'].strftime('%Y-%m')} to {data_summary['date_end'].strftime('%Y-%m')}"
-        )
-    with col3:
-        corr = data_summary['correlation_avg']
-        st.metric(
-            "Pearson Correlation",
-            f"{corr:.3f}",
-            delta="Weak positive" if 0.2 < corr < 0.4 else "Very weak" if abs(corr) < 0.2 else ""
-        )
-    with col4:
-        r_squared = corr ** 2
-        st.metric(
-            "R² (Explained Var.)",
-            f"{r_squared:.1%}",
-            delta=f"{100-r_squared*100:.0f}% unexplained",
-            delta_color="inverse"
-        )
-    
+with tab_overview:
+    st.header("Data Overview & Market Intelligence")
+
+    summary = dm.get_data_summary()
+    validation = dm.validate_data()
+
+    # Key metrics in styled cards
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("📅 Sample Size", f"{summary['sample_size']:,} days")
+    c2.metric("🗓️ Date Range",
+              f"{summary['date_start'].strftime('%b %Y')} → {summary['date_end'].strftime('%b %Y')}")
+    c3.metric("💵 Avg 5TC Price", f"${summary['price_5tc']['mean']:,.0f}/day")
+    c4.metric("📐 Avg Dispersion", f"{summary['avg_dispersion']['mean']:,.0f}")
+
+    st.markdown("")  # spacer
+
     st.info(
-        "**About the Data:**\n\n"
-        "- **5TC Front-Month (C+1MON):** Forward Freight Agreement contract for Capesize vessels. "
-        "This is the primary hedging instrument for iron ore shipping routes.\n"
-        "- **Dispersion:** Geographic spread of Capesize + VLOC vessels worldwide. "
-        "High dispersion = vessels well-positioned globally for cargo pickup.\n"
-        "- **Time Alignment:** Both series are daily observations, merged on date (inner join)."
+        "💡 **Economic Intuition (Expert-Validated)**\n\n"
+        "| Dispersion | Fleet Position | Supply | Price Impact |\n"
+        "|---|---|---|---|\n"
+        "| **HIGH** (rising) | Well spread globally | Efficient — cargo easily matched | **BEARISH** |\n"
+        "| **LOW** (falling) | Concentrated regionally | Scarcity in key loading areas | **BULLISH** |"
     )
-    
-    # ========================================================================
-    # SECTION 2: UNDERSTANDING DISPERSION METRIC
-    # ========================================================================
-    
-    st.markdown("---")
-    st.header("2️⃣ Understanding the Dispersion Metric")
-    
-    st.subheader("📐 How We Calculate Weighted Average Dispersion")
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.markdown("""
-        **Formula:**
-        ```
-        avg_dispersion = (Cape_Disp × Cape_Count + VLOC_Disp × VLOC_Count) / Total_Count
-        ```
-        
-        **Why weight by vessel COUNT and not by vessel CAPACITY?**
-        
-        1. **Market Activity Signal:** Count reflects how many vessels are actively seeking cargo. 
-           A large VLOC doesn't generate more "dispersion signal" than a smaller Capesize if both 
-           are ballasting/positioning.
-        
-        2. **Geographic Presence:** We care about spatial distribution, not total tonnage. 
-           100 Capesizes dispersed globally create better coverage than 30 VLOCs, 
-           even if tonnage is similar.
-        
-        3. **Data Reality:** The dispersion metric itself measures spatial spread of vessel positions, 
-           not their cargo capacity. Weighting by count preserves the metric's meaning.
-        
-        4. **Market Dynamics:** Both Capesize (100-180k DWT) and VLOC (200-400k DWT) compete for 
-           similar routes (Brazil-China, Australia-China iron ore). The number of competing vessels 
-           matters more than their aggregate capacity for positioning analysis.
-        """)
-        
-        st.success(
-            "**Bottom Line:** We weight by vessel count because dispersion measures "
-            "*where vessels are*, not *how much they can carry*. It's a spatial metric, not a capacity metric."
-        )
-    
-    with col2:
-        st.metric("Capesize Avg Count", f"{signals_df['cape_vessel_count'].mean():.0f} vessels")
-        st.metric("VLOC Avg Count", f"{signals_df['vloc_vessel_count'].mean():.0f} vessels")
-        st.metric("Total Avg Count", f"{signals_df['total_vessel_count'].mean():.0f} vessels")
-        
-        cape_pct = signals_df['cape_vessel_count'].mean() / signals_df['total_vessel_count'].mean()
-        vloc_pct = signals_df['vloc_vessel_count'].mean() / signals_df['total_vessel_count'].mean()
-        
-        st.markdown("**Fleet Mix:**")
-        st.progress(cape_pct, text=f"Capesize: {cape_pct:.1%}")
-        st.progress(vloc_pct, text=f"VLOC: {vloc_pct:.1%}")
-    
-    # ========================================================================
-    # SECTION 3: DISTRIBUTION ANALYSIS
-    # ========================================================================
-    
-    st.markdown("---")
-    st.header("3️⃣ Distribution Analysis")
-    
-    tab_dist = st.tabs(["5TC Prices", "Dispersion", "By Vessel Class"])
-    
-    with tab_dist[0]:
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            # Price histogram
-            fig = go.Figure()
-            fig.add_trace(go.Histogram(
-                x=signals_df['price_5tc'],
-                nbinsx=50,
-                name='5TC Price',
-                marker_color='#1f77b4',
-                opacity=0.7
-            ))
-            fig.update_layout(
-                title="5TC Price Distribution",
-                xaxis_title="Price ($/day)",
-                yaxis_title="Frequency",
-                height=350
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            price_stats = data_summary['price_5tc']
-            st.metric("Mean", f"${price_stats['mean']:.0f}/day")
-            st.metric("Std Dev", f"${price_stats['std']:.0f}")
-            st.metric("Min", f"${price_stats['min']:.0f}")
-            st.metric("Max", f"${price_stats['max']:.0f}")
-            st.metric("Range", f"${price_stats['max'] - price_stats['min']:.0f}")
-            
-            # Coefficient of variation
-            cv = price_stats['std'] / price_stats['mean']
-            st.metric("Coef. of Variation", f"{cv:.1%}")
-        
-        st.info(
-            "**Interpretation:** 5TC prices are highly volatile (CV > 50%), "
-            "typical of commodity freight markets. The distribution shows multiple modes, "
-            "reflecting different market regimes (boom/bust cycles in iron ore trade)."
-        )
-    
-    with tab_dist[1]:
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            # Dispersion histogram
-            fig = go.Figure()
-            fig.add_trace(go.Histogram(
-                x=signals_df['avg_dispersion'],
-                nbinsx=50,
-                name='Avg Dispersion',
-                marker_color='#d62728',
-                opacity=0.7
-            ))
-            fig.update_layout(
-                title="Average Dispersion Distribution",
-                xaxis_title="Dispersion Value",
-                yaxis_title="Frequency",
-                height=350
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            disp_stats = data_summary['avg_dispersion']
-            st.metric("Mean", f"{disp_stats['mean']:.0f}")
-            st.metric("Std Dev", f"{disp_stats['std']:.0f}")
-            st.metric("Min", f"{disp_stats['min']:.0f}")
-            st.metric("Max", f"{disp_stats['max']:.0f}")
-            st.metric("Range", f"{disp_stats['max'] - disp_stats['min']:.0f}")
-            
-            cv_disp = disp_stats['std'] / disp_stats['mean']
-            st.metric("Coef. of Variation", f"{cv_disp:.1%}")
-        
-        st.info(
-            "**Interpretation:** Dispersion shows moderate variability. "
-            "The metric ranges significantly, indicating real changes in vessel positioning patterns "
-            "over time (not just noise)."
-        )
-    
-    with tab_dist[2]:
-        # Scatter plot Cape vs VLOC dispersion
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=signals_df['cape_dispersion'],
-            y=signals_df['vloc_dispersion'],
-            mode='markers',
-            marker=dict(
-                size=3,
-                color=signals_df['price_5tc'],
-                colorscale='Viridis',
-                showscale=True,
-                colorbar=dict(title="5TC Price")
-            ),
-            text=[f"Date: {d.strftime('%Y-%m-%d')}<br>Price: ${p:.0f}" 
-                  for d, p in zip(signals_df['date'], signals_df['price_5tc'])],
-            hovertemplate='Cape Disp: %{x:.0f}<br>VLOC Disp: %{y:.0f}<br>%{text}<extra></extra>'
-        ))
-        fig.update_layout(
-            title="Capesize vs VLOC Dispersion (colored by 5TC price)",
-            xaxis_title="Capesize Dispersion",
-            yaxis_title="VLOC Dispersion",
-            height=400
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        
-        cape_vloc_corr = signals_df['cape_dispersion'].corr(signals_df['vloc_dispersion'])
-        st.metric("Cape-VLOC Correlation", f"{cape_vloc_corr:.3f}")
-        
-        st.info(
-            f"**Interpretation:** Capesize and VLOC dispersion are correlated at {cape_vloc_corr:.2f}, "
-            "meaning they tend to disperse/concentrate together. This makes sense as they serve "
-            "similar trade routes and respond to the same demand patterns."
-        )
-    
-    # ========================================================================
-    # SECTION 4: TIME SERIES & CORRELATION ANALYSIS
-    # ========================================================================
-    
-    st.markdown("---")
-    st.header("4️⃣ Time Series & Correlation Analysis")
-    
-    st.subheader("📈 Raw Time Series")
-    
+
     # Dual-axis time series
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
-    
-    fig.add_trace(
-        go.Scatter(
-            x=signals_df['date'],
-            y=signals_df['price_5tc'],
-            name='5TC Price',
-            line=dict(color='#132c68', width=2.5)
-        ),
-        secondary_y=False
+    st.subheader("Price & Dispersion Time Series")
+    fig_ts = make_subplots(specs=[[{"secondary_y": True}]])
+    fig_ts.add_trace(
+        go.Scatter(x=clean_data['date'], y=clean_data['price_5tc'],
+                   name='5TC Price ($/day)', line=dict(color='#132c68', width=2.5)),
+        secondary_y=False,
     )
-    
-    fig.add_trace(
-        go.Scatter(
-            x=signals_df['date'],
-            y=signals_df['avg_dispersion'],
-            name='Avg Dispersion',
-            line=dict(color='#5eb8e8', width=2.5)
-        ),
-        secondary_y=True
+    fig_ts.add_trace(
+        go.Scatter(x=clean_data['date'], y=clean_data['avg_dispersion'],
+                   name='Avg Dispersion', line=dict(color='#f4c430', width=2)),
+        secondary_y=True,
     )
-    
-    fig.update_layout(
-        title="5TC Price vs Average Dispersion (Dual Axis)",
-        hovermode='x unified',
-        height=400
+    fig_ts.update_layout(
+        template="plotly_white", height=480,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0.5, xanchor="center"),
+        margin=dict(l=60, r=60, t=40, b=40),
+        hovermode="x unified",
     )
-    fig.update_xaxes(title_text="Date")
-    fig.update_yaxes(title_text="5TC Price ($/day)", secondary_y=False)
-    fig.update_yaxes(title_text="Average Dispersion", secondary_y=True)
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    st.subheader("🔄 Rolling Correlation Analysis")
-    
-    col_corr_controls = st.columns([2, 2, 1])
-    
-    with col_corr_controls[0]:
-        window = st.slider("Select rolling window (days)", 30, 365, 90, 30)
-    
-    with col_corr_controls[1]:
-        corr_type = st.radio(
-            "Correlation Type",
-            options=["Raw Levels", "Returns (Differenced)"],
-            help="Raw Levels: correlation of prices/dispersion directly | Returns: correlation of daily changes (avoids spurious correlation)"
+    fig_ts.update_yaxes(title_text="5TC Price ($/day)", secondary_y=False,
+                        tickformat="$,.0f", gridcolor="#eee")
+    fig_ts.update_yaxes(title_text="Avg Dispersion", secondary_y=True, gridcolor="#eee")
+    st.plotly_chart(fig_ts, use_container_width=True)
+
+    # Two-column: Correlation + Rolling
+    col_corr, col_roll = st.columns(2)
+
+    with col_corr:
+        st.subheader("Correlation Matrix")
+        corr_cols = ['price_5tc', 'cape_dispersion', 'vloc_dispersion', 'avg_dispersion']
+        corr_matrix = clean_data[corr_cols].corr()
+        fig_corr = px.imshow(
+            corr_matrix, text_auto=".2f", color_continuous_scale="RdBu_r",
+            zmin=-1, zmax=1,
+            labels=dict(color="Correlation"),
         )
-    
-    # Calculate rolling correlation based on selection
-    if corr_type == "Raw Levels":
-        rolling_corr = signals_df['price_5tc'].rolling(window).corr(signals_df['avg_dispersion'])
-        overall_corr = data_summary['correlation_avg']
-        corr_description = "Price vs Dispersion (Levels)"
-        color_scheme = '#f4c430'
+        fig_corr.update_layout(height=380, margin=dict(l=20, r=20, t=30, b=20))
+        st.plotly_chart(fig_corr, use_container_width=True)
+
+    with col_roll:
+        st.subheader("Rolling 60-Day Correlation")
+        rolling_corr = clean_data['price_5tc'].rolling(60).corr(clean_data['avg_dispersion'])
+        fig_rc = go.Figure()
+        fig_rc.add_trace(go.Scatter(
+            x=clean_data['date'], y=rolling_corr,
+            line=dict(color='#132c68', width=2), fill='tozeroy',
+            fillcolor='rgba(19,44,104,0.08)', name='Rolling Corr (60d)',
+        ))
+        fig_rc.add_hline(y=0, line_dash="dash", line_color="#ccc")
+        fig_rc.update_layout(
+            yaxis_title="Correlation", template="plotly_white", height=380,
+            margin=dict(l=40, r=20, t=30, b=40), hovermode="x unified",
+        )
+        st.plotly_chart(fig_rc, use_container_width=True)
+
+    # Data quality
+    st.subheader("Data Quality Checks")
+    checks = validation.get('checks', {})
+    if checks:
+        quality_cols = st.columns(min(len(checks), 4))
+        for idx, (check_name, check_info) in enumerate(checks.items()):
+            col = quality_cols[idx % len(quality_cols)]
+            is_ok = check_info.get('status') == 'ok' if isinstance(check_info, dict) else True
+            icon = "✅" if is_ok else "⚠️"
+            col.markdown(f"{icon} **{check_name}**")
+            if isinstance(check_info, dict):
+                for k, v in check_info.items():
+                    if k != 'status':
+                        col.caption(f"{k}: {v}")
     else:
-        # Calculate returns (daily changes)
-        price_returns = signals_df['price_5tc'].pct_change()
-        disp_returns = signals_df['avg_dispersion'].pct_change()
-        rolling_corr = price_returns.rolling(window).corr(disp_returns)
-        overall_corr = price_returns.corr(disp_returns)
-        corr_description = "Price vs Dispersion (Returns)"
-        color_scheme = '#5eb8e8'
-    
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=signals_df['date'],
-        y=rolling_corr,
-        name=f'{window}-day Rolling Correlation',
-        line=dict(color=color_scheme, width=3),
-        fill='tozeroy',
-        fillcolor=f'rgba({int(color_scheme[1:3], 16)}, {int(color_scheme[3:5], 16)}, {int(color_scheme[5:7], 16)}, 0.2)'
-    ))
-    fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
-    fig.add_hline(y=overall_corr, line_dash="dot", line_color="red", 
-                  annotation_text=f"Overall: {overall_corr:.3f}")
-    fig.update_layout(
-        title=f"Rolling {window}-Day Correlation: {corr_description}",
-        xaxis_title="Date",
-        yaxis_title="Correlation Coefficient",
-        height=350
-    )
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Display metrics
-    col_metrics1, col_metrics2, col_metrics3 = st.columns(3)
-    with col_metrics1:
-        st.metric("Overall Correlation", f"{overall_corr:.3f}")
-    with col_metrics2:
-        st.metric("Mean Rolling Corr", f"{rolling_corr.mean():.3f}")
-    with col_metrics3:
-        st.metric("Std Dev", f"{rolling_corr.std():.3f}", delta="Volatility of relationship")
-    
-    if corr_type == "Raw Levels":
-        st.warning(
-            "**⚠️ Key Observation (Raw Levels):** The rolling correlation varies significantly over time. "
-            "It's sometimes strongly positive, sometimes near zero, and occasionally negative. "
-            "This indicates the relationship is **not stable** - it changes with market regimes. "
-            "Any trading strategy must account for this non-stationarity.\n\n"
-            "**Note:** Raw level correlations can be **spurious** (both series trending together without causal link). "
-            "Consider analyzing **Returns** for a more robust measure of true co-movement."
-        )
-    else:
-        st.info(
-            "**📊 Returns Correlation Analysis (Differenced Data):**\n\n"
-            f"Overall correlation on returns: **{overall_corr:.3f}**\n\n"
-            "This measures co-movement of **daily changes** rather than levels, avoiding spurious correlation "
-            "from common trends. A lower correlation on returns vs levels suggests much of the level correlation "
-            "was driven by shared trends (e.g., both rising in bull markets) rather than true day-to-day co-movement.\n\n"
-            f"**Interpretation:** {'Weak' if abs(overall_corr) < 0.2 else 'Moderate' if abs(overall_corr) < 0.4 else 'Strong'} "
-            f"day-to-day co-movement between price changes and dispersion changes."
-        )
-    
-    # ========================================================================
-    # SECTION 5: GRANGER CAUSALITY TEST
-    # ========================================================================
-    
-    st.markdown("---")
-    st.header("5️⃣ Granger Causality & Predictive Power Analysis")
-    
+        st.success("✅ All data quality checks passed.")
+
+
+# ============================================================================
+# TAB 2: SIGNAL EXPLORER
+# ============================================================================
+
+with tab_signals:
+    st.header("Signal Explorer")
+
     st.info(
-        "**🎯 Economic Rationale: Why Test Granger Causality?**\n\n"
-        "**Question:** Does vessel positioning today predict freight rates tomorrow?\n\n"
-        "**Theory:** When vessels disperse globally (high dispersion), they are better positioned to "
-        "pick up cargo quickly. This should lead to higher freight rates as charterers compete for well-positioned tonnage. "
-        "**If this relationship has a time lag** (vessels reposition → rates adjust), dispersion could be a **leading indicator**.\n\n"
-        "**Granger Causality Test** formally tests if past dispersion values help predict future prices, "
-        "beyond what past prices already tell us. This is the gold standard for testing predictive relationships in time series."
+        "🎯 **Two complementary signals** generated from fleet dispersion data, "
+        "both using corrected economic logic: HIGH dispersion = BEARISH, LOW dispersion = BULLISH.\n\n"
+        "1. **Inverted Momentum** — trades short-term directional changes (60d window)\n"
+        "2. **Mean Reversion** — fades extreme deviations from 120-day equilibrium (accordion effect)"
     )
-    
-    # Create sub-tabs for different analysis steps
-    granger_tabs = st.tabs([
-        "📋 Step 1: Stationarity Check",
-        "📊 Step 2: Granger Test Results",
-        "💡 Step 3: Economic Interpretation"
-    ])
-    
-    # ========================================================================
-    # SUB-TAB 1: STATIONARITY CHECK
-    # ========================================================================
-    
-    with granger_tabs[0]:
-        st.subheader("Augmented Dickey-Fuller (ADF) Test")
-        
-        st.markdown("""
-        **Why check stationarity?**  
-        Granger causality tests require **stationary data** (constant mean/variance over time). 
-        If series are non-stationary (trending), we must difference them first to avoid spurious results.
-        
-        **Augmented Dickey-Fuller (ADF) Test:**
-        - **Null Hypothesis:** Series has a unit root (non-stationary)
-        - **Alternative:** Series is stationary
-        - **Decision Rule:** p-value < 0.05 → Reject null → Series is stationary ✅
-        """)
-        
-        st.markdown("---")
-    
-    try:
-        from statsmodels.tsa.stattools import grangercausalitytests, adfuller
-        
-        # Prepare data (drop NaNs)
-        test_data = signals_df[['price_5tc', 'avg_dispersion']].dropna()
-        
-        # Step 1: ADF Test for Stationarity
-        def run_adf_test(series, name):
-            result = adfuller(series.dropna(), autolag='AIC')
-            return {
-                'name': name,
-                'adf_stat': result[0],
-                'p_value': result[1],
-                'is_stationary': result[1] < 0.05,
-                'critical_1pct': result[4]['1%'],
-                'critical_5pct': result[4]['5%'],
-                'critical_10pct': result[4]['10%']
-            }
-        
-        price_adf = run_adf_test(test_data['price_5tc'], '5TC Price')
-        disp_adf = run_adf_test(test_data['avg_dispersion'], 'Dispersion')
-        
-        # Continue in Sub-Tab 1
-        with granger_tabs[0]:
-            # Display ADF results
-            col_adf1, col_adf2 = st.columns(2)
-            
-            with col_adf1:
-                st.markdown("**5TC Price Series**")
-                if price_adf['is_stationary']:
-                    st.success(f"✅ **Stationary** (p-value: {price_adf['p_value']:.4f})")
-                else:
-                    st.warning(f"⚠️ **Non-Stationary** (p-value: {price_adf['p_value']:.4f})")
-                st.caption(f"ADF Statistic: {price_adf['adf_stat']:.3f}")
-                st.caption(f"Critical Value (5%): {price_adf['critical_5pct']:.3f}")
-            
-            with col_adf2:
-                st.markdown("**Dispersion Series**")
-                if disp_adf['is_stationary']:
-                    st.success(f"✅ **Stationary** (p-value: {disp_adf['p_value']:.4f})")
-                else:
-                    st.warning(f"⚠️ **Non-Stationary** (p-value: {disp_adf['p_value']:.4f})")
-                st.caption(f"ADF Statistic: {disp_adf['adf_stat']:.3f}")
-                st.caption(f"Critical Value (5%): {disp_adf['critical_5pct']:.3f}")
-            
-            # Determine if differencing is needed
-            needs_differencing = not (price_adf['is_stationary'] and disp_adf['is_stationary'])
-            
+
+    # ── Current signal state ──
+    if len(signals_df) > 0:
+        latest = signals_df.iloc[-1]
+        mom_v = latest.get('signal_momentum', 0)
+        mr_v = latest.get('signal_mean_reversion', 0)
+
+        st.markdown("### 📡 Current Signal State")
+        sc1, sc2, sc3, sc4 = st.columns(4)
+        sc1.markdown(
+            f"<div class='metric-card'><h4>Momentum Signal</h4>"
+            f"<div>{signal_badge_html(mom_v)}</div>"
+            f"<div class='sub'>z-score: {latest.get('momentum_zscore', 0):.2f}σ</div></div>",
+            unsafe_allow_html=True
+        )
+        sc2.markdown(
+            f"<div class='metric-card'><h4>Mean Reversion Signal</h4>"
+            f"<div>{signal_badge_html(mr_v)}</div>"
+            f"<div class='sub'>z-score: {latest.get('avg_disp_mr_zscore', 0):.2f}σ</div></div>",
+            unsafe_allow_html=True
+        )
+        sc3.markdown(
+            f"<div class='metric-card'><h4>5TC Price</h4>"
+            f"<div class='value'>${latest['price_5tc']:,.0f}</div>"
+            f"<div class='sub'>per day</div></div>",
+            unsafe_allow_html=True
+        )
+        sc4.markdown(
+            f"<div class='metric-card'><h4>Dispersion Regime</h4>"
+            f"<div class='value' style='font-size:1.3rem;'>{latest.get('disp_quartile', 'N/A')}</div>"
+            f"<div class='sub'>avg: {latest['avg_dispersion']:,.0f}</div></div>",
+            unsafe_allow_html=True
+        )
+
+        st.markdown("")
+
+    # Explanations in expanders
+    for key in ('momentum', 'mean_reversion'):
+        expl = sg.get_signal_explanation(key)
+        with st.expander(f"📖 {expl.get('description', key)}", expanded=False):
+            col_logic, col_econ = st.columns(2)
+            with col_logic:
+                st.markdown(f"**🔧 Logic**\n\n{expl.get('logic', '')}")
+                st.markdown(f"**⏱️ Horizon:** {expl.get('horizon', '')}")
+            with col_econ:
+                st.markdown(f"**💡 Economic Meaning**\n\n{expl.get('economic_meaning', '')}")
+                st.markdown(f"**📝 Rationale**\n\n{expl.get('rationale', '')}")
+
+    # Signal overlay on price chart
+    st.subheader("Signals Overlaid on Price")
+
+    ov_col1, ov_col2, _ = st.columns([1, 1, 3])
+    with ov_col1:
+        show_momentum = st.checkbox("Show Inverted Momentum", value=True)
+    with ov_col2:
+        show_mr = st.checkbox("Show Mean Reversion", value=True)
+
+    fig_sig = make_subplots(
+        rows=2, cols=1, shared_xaxes=True,
+        row_heights=[0.6, 0.4], vertical_spacing=0.06,
+        subplot_titles=("5TC Price ($/day)", "Signal Value (−1 to +1)")
+    )
+
+    fig_sig.add_trace(
+        go.Scatter(x=signals_df['date'], y=signals_df['price_5tc'],
+                   name='5TC Price', line=dict(color='#132c68', width=2.5)),
+        row=1, col=1,
+    )
+
+    if show_momentum and 'signal_momentum' in signals_df.columns:
+        # Color fill for long/short regions
+        fig_sig.add_trace(
+            go.Scatter(x=signals_df['date'], y=signals_df['signal_momentum'],
+                       name='Inverted Momentum', line=dict(color='#e74c3c', width=1.5),
+                       fill='tozeroy', fillcolor='rgba(231,76,60,0.1)'),
+            row=2, col=1,
+        )
+
+    if show_mr and 'signal_mean_reversion' in signals_df.columns:
+        fig_sig.add_trace(
+            go.Scatter(x=signals_df['date'], y=signals_df['signal_mean_reversion'],
+                       name='Mean Reversion', line=dict(color='#2ecc71', width=1.5),
+                       fill='tozeroy', fillcolor='rgba(46,204,113,0.1)'),
+            row=2, col=1,
+        )
+
+    fig_sig.add_hline(y=0, row=2, col=1, line_dash="dash", line_color="#bbb", line_width=1)
+    fig_sig.add_hline(y=0.5, row=2, col=1, line_dash="dot", line_color="#ddd", line_width=0.5)
+    fig_sig.add_hline(y=-0.5, row=2, col=1, line_dash="dot", line_color="#ddd", line_width=0.5)
+    fig_sig.update_layout(
+        template="plotly_white", height=620,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0.5, xanchor="center"),
+        margin=dict(l=60, r=40, t=50, b=40), hovermode="x unified",
+    )
+    fig_sig.update_yaxes(tickformat="$,.0f", row=1, col=1)
+    fig_sig.update_yaxes(range=[-1.15, 1.15], row=2, col=1)
+    st.plotly_chart(fig_sig, use_container_width=True)
+
+    # Signal statistics
+    st.subheader("Signal Statistics")
+    sig_stats = sg.get_signal_statistics()
+    if sig_stats:
+        for sig_name, stats in sig_stats.items():
+            label = "📉 Inverted Momentum" if "momentum" in sig_name else "🔄 Mean Reversion"
+            st.markdown(f"#### {label}")
+
+            s1, s2, s3, s4, s5, s6 = st.columns(6)
+            s1.metric("Long Days", f"{stats['long_signals']:,}")
+            s2.metric("Short Days", f"{stats['short_signals']:,}")
+            s3.metric("Flat Days", f"{stats['flat_signals']:,}")
+
+            win_l = stats.get('win_rate_long', np.nan)
+            win_s = stats.get('win_rate_short', np.nan)
+            avg_ret_l = stats.get('avg_return_on_long', np.nan)
+
+            s4.metric("Win Rate (Long)", f"{win_l:.1%}" if not np.isnan(win_l) else "N/A")
+            s5.metric("Win Rate (Short)", f"{win_s:.1%}" if not np.isnan(win_s) else "N/A")
+            s6.metric("Avg Return (Long)", f"{avg_ret_l:.4f}" if not np.isnan(avg_ret_l) else "N/A")
+
             st.markdown("---")
-            st.subheader("🔧 Data Preparation Decision")
-            
-            if needs_differencing:
-                st.warning(
-                    "⚠️ **One or both series are non-stationary.** "
-                    "We will use **first differences** (daily changes) for the Granger test to ensure valid results."
-                )
-                # Apply first differencing
-                test_data_granger = test_data.diff().dropna()
-                data_type = "First Differences (Daily Changes)"
-                
-                st.info(
-                    "**Transformation Applied:**\n\n"
-                    "```\n"
-                    "price_diff[t] = price[t] - price[t-1]\n"
-                    "disp_diff[t] = disp[t] - disp[t-1]\n"
-                    "```\n\n"
-                    "This removes trends and makes the series stationary, allowing for valid Granger causality testing."
-                )
-            else:
-                st.success(
-                    "✅ **Both series are stationary.** "
-                    "We can proceed with Granger causality test on the raw levels."
-                )
-                test_data_granger = test_data.copy()
-                data_type = "Raw Levels"
-        
-        # ========================================================================
-        # SUB-TAB 2: GRANGER TEST RESULTS
-        # ========================================================================
-        
-        with granger_tabs[1]:
-            st.subheader("Granger Causality Test: Dispersion → Prices")
-        
-            st.markdown(f"""
-            **Test Setup:**
-            - **Data:** {data_type}
-            - **Null Hypothesis:** Dispersion does NOT Granger-cause prices
-            - **Alternative:** Dispersion DOES Granger-cause prices (predictive power)
-            - **Test Statistic:** F-test comparing restricted vs unrestricted models
-            """)
-            
-            # Test with multiple lags
-            max_lag = st.slider("Maximum lag to test (days)", 1, 20, 10, 1, key="granger_lag_slider")
-            
-            with st.spinner("Running Granger causality tests..."):
-                # Test: Does dispersion Granger-cause price?
-                gc_results = grangercausalitytests(
-                    test_data_granger[['price_5tc', 'avg_dispersion']], 
-                    max_lag,
-                    verbose=False
-                )
-        
-            # Extract p-values and statistics
-            results_list = []
-            for lag in range(1, max_lag + 1):
-                # Get F-test p-value (ssr_ftest)
-                f_test = gc_results[lag][0]['ssr_ftest']
-                f_stat = f_test[0]
-                p_value = f_test[1]
-                results_list.append({
-                    'Lag': lag,
-                    'F-statistic': f_stat,
-                    'p-value': p_value,
-                    'Significant (5%)': '✅ Yes' if p_value < 0.05 else '❌ No',
-                    'Significant (10%)': '✅ Yes' if p_value < 0.10 else '❌ No'
-                })
-            
-            results_df = pd.DataFrame(results_list)
-            
-            # Find optimal lag (lowest p-value)
-            optimal_lag_idx = results_df['p-value'].idxmin()
-            optimal_lag = results_df.loc[optimal_lag_idx, 'Lag']
-            optimal_pvalue = results_df.loc[optimal_lag_idx, 'p-value']
-            optimal_fstat = results_df.loc[optimal_lag_idx, 'F-statistic']
-            
-            # Display optimal lag summary
-            st.markdown("---")
-            col_opt1, col_opt2, col_opt3, col_opt4 = st.columns(4)
-        
-            with col_opt1:
-                st.metric("🎯 Optimal Lag", f"{int(optimal_lag)} days", delta="Lowest p-value")
-            with col_opt2:
-                st.metric("📊 F-Statistic", f"{optimal_fstat:.2f}", delta=f"at {int(optimal_lag)}-day lag")
-            with col_opt3:
-                sig_status = "Significant ✅" if optimal_pvalue < 0.05 else "Not Significant ❌"
-                st.metric("P-value", f"{optimal_pvalue:.4f}", delta=sig_status)
-            with col_opt4:
-                significant_5 = (results_df['p-value'] < 0.05).sum()
-                st.metric("Significant Lags (5%)", f"{significant_5}/{max_lag}")
-            
-            st.markdown("---")
-            
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                # Plot p-values
-                fig = go.Figure()
-                
-                # Main p-value line
-                fig.add_trace(go.Scatter(
-                    x=results_df['Lag'],
-                    y=results_df['p-value'],
-                    mode='lines+markers',
-                    name='p-value',
-                    line=dict(color='#f4c430', width=3),
-                    marker=dict(size=10, color='#132c68', line=dict(color='#f4c430', width=2))
-                ))
-                
-                # Highlight optimal lag
-                fig.add_trace(go.Scatter(
-                    x=[optimal_lag],
-                    y=[optimal_pvalue],
-                    mode='markers',
-                    name='Optimal Lag',
-                    marker=dict(size=20, color='#5eb8e8', symbol='star', line=dict(width=2, color='white')),
-                    hovertemplate=f'<b>⭐ OPTIMAL LAG: {int(optimal_lag)} days</b><br>p-value: {optimal_pvalue:.4f}<extra></extra>'
-                ))
-                
-                # Significance thresholds
-                fig.add_hline(y=0.05, line_dash="dash", line_color="red", line_width=2,
-                             annotation_text="5% significance", annotation_position="right")
-                fig.add_hline(y=0.10, line_dash="dot", line_color="orange", line_width=2,
-                             annotation_text="10% significance", annotation_position="right")
-                
-                fig.update_layout(
-                    title=f"Granger Causality Test: P-values by Lag ({data_type})",
-                    xaxis_title="Lag (days)",
-                    yaxis_title="P-value",
-                    height=400,
-                    showlegend=False
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                st.markdown("**📊 Summary Statistics:**")
-                significant_10 = (results_df['p-value'] < 0.10).sum()
-                
-                st.caption(f"**Lags tested:** {max_lag}")
-                st.caption(f"**Significant at 5%:** {significant_5} lags")
-                st.caption(f"**Significant at 10%:** {significant_10} lags")
-                st.caption(f"**Min p-value:** {optimal_pvalue:.4f}")
-                st.caption(f"**Max p-value:** {results_df['p-value'].max():.4f}")
-                st.caption(f"**Mean p-value:** {results_df['p-value'].mean():.4f}")
-                
-                st.markdown("---")
-                
-            
-            with st.expander("📊 Detailed Results Table"):
-                st.dataframe(
-                    results_df.style.background_gradient(
-                        subset=['p-value'], 
-                        cmap='RdYlGn_r',  # Red (high p-value) to Green (low p-value)
-                        vmin=0, 
-                        vmax=0.15
-                    ),
-                    use_container_width=True, 
-                    hide_index=True
-                )
-        
-        # ========================================================================
-        # SUB-TAB 3: ECONOMIC INTERPRETATION
-        # ========================================================================
-        
-        with granger_tabs[2]:
-            st.subheader("Trading Implications & Economic Context")
-        
-            if optimal_pvalue < 0.05:
-                st.success(
-                    f"✅ **SIGNIFICANT PREDICTIVE RELATIONSHIP DETECTED**\n\n"
-                    f"**Finding:** Dispersion Granger-causes prices with optimal lag of **{int(optimal_lag)} days** "
-                    f"(p-value: {optimal_pvalue:.4f}, F-stat: {optimal_fstat:.2f})\n\n"
-                    f"**What this means economically:**\n"
-                    f"- Changes in vessel dispersion today predict price changes {int(optimal_lag)} days later\n"
-                    f"- When vessels spread globally (↑ dispersion), rates tend to rise {int(optimal_lag)} days ahead\n"
-                    f"- This lag likely reflects: vessel repositioning time ({int(optimal_lag//7)} weeks), "
-                    f"contract negotiation periods, or information diffusion in forward markets\n\n"
-                    f"**Trading Implications:**\n"
-                    f"- Dispersion can be used as a **leading indicator** with {int(optimal_lag)}-day horizon\n"
-                    f"- Forward contracts (C+1MON) may take ~{int(optimal_lag)} days to fully price in fleet positioning\n"
-                    f"- Strategy: Monitor dispersion changes → anticipate price moves {int(optimal_lag)} days later"
-                )
-                
-                if significant_5 > max_lag * 0.5:
-                    st.info(
-                        f"💡 **Strong Evidence:** {significant_5}/{max_lag} lags are significant. "
-                        f"Multiple lags show predictive power, suggesting a robust relationship."
-                    )
-            
-            elif optimal_pvalue < 0.10:
-                st.warning(
-                    f"⚠️ **WEAK PREDICTIVE RELATIONSHIP DETECTED**\n\n"
-                    f"**Finding:** Dispersion shows marginal Granger causality at optimal lag of **{int(optimal_lag)} days** "
-                    f"(p-value: {optimal_pvalue:.4f}, F-stat: {optimal_fstat:.2f})\n\n"
-                    f"**What this means:**\n"
-                    f"- Evidence is **borderline significant** (p-value between 0.05 and 0.10)\n"
-                    f"- Dispersion may have some predictive power, but it's weak and unreliable\n"
-                    f"- Only {significant_5} out of {max_lag} lags are significant at 5% level\n\n"
-                    f"**Trading Implications:**\n"
-                    f"- Dispersion should be used as a **confirmation signal**, not primary signal\n"
-                    f"- Combine with other factors (fundamentals, technicals, sentiment)\n"
-                    f"- Standalone trading on dispersion is **not recommended** (high risk of false signals)"
-                )
-            
-            else:
-                st.error(
-                    f"❌ **NO SIGNIFICANT PREDICTIVE RELATIONSHIP**\n\n"
-                    f"**Finding:** Dispersion does NOT Granger-cause prices (p-value: {optimal_pvalue:.4f} > 0.05)\n\n"
-                    f"**What this means economically:**\n"
-                    f"- Past dispersion values do NOT help predict future prices beyond what prices already tell us\n"
-                    f"- The correlation we observe is likely **contemporaneous** (both move together) rather than **predictive**\n"
-                    f"- Dispersion and prices may be driven by common factors (e.g., iron ore demand) without causal link\n\n"
-                    f"**Trading Implications:**\n"
-                    f"- Dispersion is NOT a reliable leading indicator for this dataset\n"
-                    f"- Using dispersion for systematic trading is **NOT recommended**\n"
-                    f"- The relationship may be spurious or driven by shared trends\n\n"
-                    f"**Why might this happen?**\n"
-                    f"- Forward contracts (C+1MON) may already price in expected fleet positioning\n"
-                    f"- Market is efficient → dispersion information is already in prices\n"
-                    f"- Non-linear relationship not captured by Granger test"
-                )
-                
-                if needs_differencing:
-                    st.info(
-                        "📌 **Note:** We used first differences (daily changes) because the raw series were non-stationary. "
-                        "The lack of Granger causality on **changes** suggests day-to-day dispersion fluctuations "
-                        "don't predict day-to-day price movements, even if the levels correlate."
-                    )
-            
-            # Add context about limitations
-            st.markdown("---")
-            st.subheader("⚠️ Important Caveats")
-            
-            col_cav1, col_cav2 = st.columns(2)
-            
-            with col_cav1:
-                st.markdown("**Statistical Limitations:**")
-                st.caption("• **Linear relationships only** - Granger test can't detect non-linear patterns")
-                st.caption("• **In-sample test** - Results may not hold out-of-sample")
-                st.caption("• **Multiple testing** - With many lags, some significance by chance")
-                st.caption("• **Correlation ≠ Causation** - Granger 'causality' is predictive, not true causation")
-            
-            with col_cav2:
-                st.markdown("**Economic Limitations:**")
-                st.caption("• **Statistical significance ≠ Economic profitability**")
-                st.caption("• **Transaction costs** matter (predictability may be unprofitable after fees)")
-                st.caption("• **Regime changes** - Relationship may break down in different markets")
-                st.caption("• **Data frequency** - Daily data may miss intraday dynamics")
-    
-    except Exception as e:
-        st.error(f"Could not perform Granger causality test: {e}")
-        st.info("Install statsmodels package: `pip install statsmodels`")
-    
-    # ========================================================================
-    # SECTION 6: DATA QUALITY CHECKS
-    # ========================================================================
-    
-    st.markdown("---")
-    st.header("6️⃣ Data Quality Checks")
-    
-    validation_report = dm.validate_data()
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("**📋 Completeness:**")
-        st.metric("Total Rows", f"{len(signals_df):,}")
-        
-        # Calculate warm-up period (rows with NaN from rolling windows)
-        warmup_rows = signals_df.isna().any(axis=1).sum()
-        usable_rows = len(signals_df) - warmup_rows
-        
-        st.metric("Usable Rows", f"{usable_rows:,}", 
-                 delta=f"{warmup_rows} warm-up rows" if warmup_rows > 0 else "All rows usable",
-                 delta_color="off")
-        
-        if warmup_rows > 0:
-            st.info(f"ℹ️ {warmup_rows} initial rows excluded (60-day rolling window warm-up)")
-        else:
-            st.success("✅ No missing data")
-    
-    with col2:
-        st.markdown("**🔍 Outliers:**")
-        outlier_check = validation_report['checks']['price_outliers']
-        st.metric("Price Outliers (>5σ)", outlier_check['count'])
-        if outlier_check['status'] == 'ok':
-            st.success("✅ No extreme outliers")
-        else:
-            st.warning(f"⚠️ {outlier_check['count']} outliers detected")
-    
-    with col3:
-        st.markdown("**📅 Continuity:**")
-        continuity = validation_report['checks']['date_continuity']
-        st.metric("Max Gap (days)", continuity['max_gap_days'])
-        if continuity['status'] == 'ok':
-            st.success("✅ Good continuity")
-        else:
-            st.warning(f"⚠️ Gap up to {continuity['max_gap_days']} days")
-    
-    
-    st.success(
-        "**✅ Data Quality Summary:**\n\n"
-        "- No missing values\n"
-        "- No extreme outliers (>5σ) in prices\n"
-        "- Reasonable date continuity\n"
-        "- Sufficient variance in both series\n"
-        "- **Conclusion: Data is suitable for analysis**"
+
+    # Latest signals table
+    st.subheader("Latest Signals (last 20 days)")
+    latest_df = sg.get_latest_signals(20)
+    st.dataframe(
+        latest_df.style.format({
+            'price_5tc': '${:,.0f}',
+            'avg_dispersion': '{:,.0f}',
+            'cape_dispersion': '{:,.0f}',
+            'vloc_dispersion': '{:,.0f}',
+            'avg_disp_change_5d': '{:+.1f}',
+            'momentum_zscore': '{:.2f}',
+            'avg_disp_mr_zscore': '{:.2f}',
+            'signal_momentum': '{:+.2f}',
+            'signal_mean_reversion': '{:+.2f}',
+            'return_5d': '{:.4f}',
+        }, na_rep="—"),
+        use_container_width=True,
+        height=500,
     )
 
 
 # ============================================================================
-# TAB 2: STRATEGY & PERFORMANCE (MERGED)
+# TAB 3: BACKTEST RESULTS
 # ============================================================================
 
-elif tab_choice == "⚡ Strategy & Performance":
-    st.markdown("""
-    <div style='background: linear-gradient(135deg, #132c68 0%, #1a3a7f 100%); padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;'>
-        <h1 style='color: white; margin: 0;'>⚡ Strategy Engine & Performance Analytics</h1>
-        <p style='color: #f4c430; margin: 0.5rem 0 0 0; font-size: 1.1rem;'>Quantitative Signals Powering Freight Trading Decisions</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Strategy overview banner
-    col_banner1, col_banner2, col_banner3 = st.columns(3)
-    with col_banner1:
-        st.metric("📊 Strategy Type", "Multi-Threshold Momentum")
-    with col_banner2:
-        active_pct = (signals_df['signal_momentum'] != 0).sum() / len(signals_df)
-        st.metric("📅 Active Days", f"{active_pct:.1%}", f"{(signals_df['signal_momentum'] != 0).sum():,} of {len(signals_df):,}")
-    with col_banner3:
-        st.metric("⏱️ Signal Lag", f"{signal_lag} days", "Immediate" if signal_lag == 0 else "Delayed")
-    
-    st.markdown("---")
-    
-    # Create sub-tabs for different aspects
-    subtab1, subtab2, subtab3, subtab4 = st.tabs([
-        "🎯 Signal Logic",
-        "📊 Performance Metrics", 
-        "📋 Trade Analysis",
-        "💾 Export Results"
-    ])
-    
-    # ========================================================================
-    # SUBTAB 1: SIGNAL LOGIC
-    # ========================================================================
-    
-    with subtab1:
-        st.header("🎯 Trading Signal Explanation")
-        
-        explanations = sg.get_all_explanations()
-        exp = explanations['momentum']
-        
-        # Quick summary card
-        st.info(
-            "**Core Strategy:** Multi-threshold momentum based on vessel dispersion changes\n\n"
-            "📈 **LONG** when vessels disperse (spreading globally) → bullish positioning\n\n"
-            "📉 **SHORT** when vessels concentrate (clustering regionally) → bearish positioning"
+with tab_backtest:
+    st.header("Backtest Results")
+
+    st.info(
+        f"🏬 **Configuration:** {strategy_choice} · "
+        f"Capital: ${initial_capital:,.0f} · Fees: {transaction_fees_bps} bps · "
+        f"Lag: {signal_lag}d · MR threshold: {mr_threshold}σ"
+    )
+
+    def run_backtest(signal_col, name):
+        engine = BacktestEngine(
+            data_with_signals=signals_df,
+            initial_capital=initial_capital,
+            transaction_fee_bps=transaction_fees_bps,
         )
-        
-        col_logic1, col_logic2 = st.columns(2)
-        
-        with col_logic1:
-            st.markdown("**📋 Strategy Details:**")
-            st.markdown(f"- **Type:** {exp['signal_type']}")
-            st.markdown(f"- **Horizon:** {exp['horizon']}")
-            st.markdown(f"- **Lag:** {signal_lag} days")
-            
-        with col_logic2:
-            st.markdown("**⚙️ Core Logic:**")
-            st.code(exp['logic'], language=None)
-        
-        st.markdown("---")
-        
-        # Position sizing tiers
-        st.subheader("📊 Position Sizing Framework")
-        
-        col_tier1, col_tier2, col_tier3, col_tier4 = st.columns(4)
-        
-        with col_tier1:
-            st.metric("🟢 MEDIUM", "25%", "1.0σ ≤ |z| < 1.5σ")
-        with col_tier2:
-            st.metric("🟡 STRONG", "50%", "1.5σ ≤ |z| < 2.0σ")
-        with col_tier3:
-            st.metric("🟠 V.STRONG", "75%", "2.0σ ≤ |z| < 2.5σ")
-        with col_tier4:
-            st.metric("🔴 EXTREME", "100%", "|z| ≥ 2.5σ")
-        
-        st.markdown("---")
-        
-        # Protective mechanisms
-        st.subheader("🛡️ Risk Management Filters")
-        
-        col_protect1, col_protect2, col_protect3 = st.columns(3)
-        
-        with col_protect1:
-            st.markdown("**1️⃣ Persistence Filter**")
-            st.info("Requires **2 consecutive days** same direction to filter noise")
-        
-        with col_protect2:
-            st.markdown("**2️⃣ Volatility Filter**")
-            st.info("Blocks trading when |price z-score| > **2.0σ** (extreme volatility on the FFA price)")
-        
-        with col_protect3:
-            st.markdown("**3️⃣ Regime Detection**")
-            st.info("Avoids trading in low-volatility regimes (90-day lookback dispersion vol > **0.5σ**)")
-        
-        st.success(
-            f"**🎯 Bottom Line:** {exp['rationale']}"
+        results = engine.backtest_strategy(signal_col, name)
+        return engine, results
+
+    # ── Run selected strategy(ies) ──
+    with st.spinner("Running backtest..."):
+        if strategy_choice == "Inverted Momentum":
+            engine_mom, res_mom = run_backtest('signal_momentum', 'Inverted Momentum')
+            engines = [('Inverted Momentum', engine_mom, res_mom)]
+        elif strategy_choice == "Mean Reversion":
+            engine_mr, res_mr = run_backtest('signal_mean_reversion', 'Mean Reversion')
+            engines = [('Mean Reversion', engine_mr, res_mr)]
+        else:  # Compare Both
+            engine_mom, res_mom = run_backtest('signal_momentum', 'Inverted Momentum')
+            engine_mr, res_mr = run_backtest('signal_mean_reversion', 'Mean Reversion')
+            engines = [
+                ('Inverted Momentum', engine_mom, res_mom),
+                ('Mean Reversion', engine_mr, res_mr),
+            ]
+
+    # ── Display results for each strategy ──
+    for label, engine, results in engines:
+        st.subheader(f"📌 {label}")
+
+        # Metrics row
+        m1, m2, m3, m4, m5 = st.columns(5)
+        ret_color = "normal" if results['total_return_pct'] >= 0 else "inverse"
+        m1.metric("Total Return", f"{results['total_return_pct']:.1%}",
+                  delta=f"${results['total_pnl']:,.0f}")
+        m2.metric("Annualized Return", f"{results['annualized_return_pct']:.1%}")
+        m3.metric("Sharpe Ratio", f"{results['sharpe_ratio']:.2f}")
+        m4.metric("Max Drawdown", f"{results['max_drawdown_pct']:.1%}")
+        m5.metric("Win Rate", f"{results['win_rate']:.1%}",
+                  delta=f"{results['num_trades']} trades")
+
+        # Summary line
+        pf = results.get('profit_factor', 0)
+        pf_str = f"{pf:.2f}" if pf != np.inf else "∞"
+        st.caption(
+            f"**{results['winning_trades']}W / {results['losing_trades']}L** · "
+            f"Profit Factor: {pf_str} · "
+            f"Total Fees: ${results.get('total_fees_paid', 0):,.0f} · "
+            f"RF Rate: {results.get('risk_free_rate', 0.02):.2%} · "
+            f"Vol: {results.get('annualized_volatility', 0):.1%}"
         )
-        
-        # Latest signals preview
-        st.markdown("---")
-        st.subheader("📋 Recent Signals (Last 10 Days)")
-        
-        latest_signals = sg.get_latest_signals(n_rows=10).copy()
-        latest_signals['date'] = latest_signals['date'].dt.strftime('%Y-%m-%d')
-        latest_signals['price_5tc'] = latest_signals['price_5tc'].apply(lambda x: f"${x:.0f}")
-        latest_signals['avg_dispersion'] = latest_signals['avg_dispersion'].apply(lambda x: f"{x:.0f}")
-        latest_signals['return_5d'] = latest_signals['return_5d'].apply(lambda x: f"{x:+.2%}")
-        
-        def signal_emoji(val):
-            if val > 0:
-                size_pct = int(val * 100)
-                return f"🟢 LONG ({size_pct}%)"
-            elif val < 0:
-                size_pct = int(abs(val) * 100)
-                return f"🔴 SHORT ({size_pct}%)"
-            else:
-                return "⚪ FLAT (0%)"
-        
-        latest_signals['Signal'] = latest_signals['signal_momentum'].apply(signal_emoji)
-        
-        display_cols = ['date', 'price_5tc', 'Signal', 'avg_dispersion', 'return_5d']
-        
-        st.dataframe(
-            latest_signals[display_cols],
-            use_container_width=True,
-            hide_index=True
-        )
-    
-    # ========================================================================
-    # SUBTAB 2: PERFORMANCE METRICS
-    # ========================================================================
-    
-    with subtab2:
-        st.header("📊 Backtest Performance Dashboard")
-        
-        # Run backtest
-        signal_col = 'signal_momentum'
-        strategy_choice = 'Momentum'
-        
-        with st.spinner("Running backtest..."):
-            engine = BacktestEngine(
-                signals_df,
-                initial_capital=initial_capital,
-                transaction_fee_bps=fee_bps
-            )
-            results = engine.backtest_strategy(signal_col, strategy_choice)
-        
-        # Configuration info
-        with st.expander("⚙️ Backtest Configuration"):
-            conf_col1, conf_col2, conf_col3, conf_col4 = st.columns(4)
-            with conf_col1:
-                st.metric("Initial Capital", f"${initial_capital:,}")
-            with conf_col2:
-                st.metric("Transaction Fees", f"{fee_bps} bps")
-            with conf_col3:
-                st.metric("Position Sizing", "Multi-Threshold")
-            with conf_col4:
-                st.metric("Persistence", "2 days")
-        
-        st.markdown("---")
-        
-        # Key Performance Indicators
-        st.subheader("📈 Key Performance Indicators")
-        
-        # First row: Main metrics
-        metric_cols = st.columns(5)
-        
-        with metric_cols[0]:
-            st.metric(
-                "Total Return",
-                f"{results['total_return_pct']:.1%}",
-                f"${results['total_pnl']:,.0f}"
-            )
-        
-        with metric_cols[1]:
-            st.metric(
-                "Annualized Return",
-                f"{results['annualized_return_pct']:.1%}",
-                "Per year"
-            )
-        
-        with metric_cols[2]:
-            sharpe_color = "inverse" if results['sharpe_ratio'] < 0.5 else "normal"
-            st.metric(
-                "Sharpe Ratio",
-                f"{results['sharpe_ratio']:.2f}",
-                "Risk-adjusted return",
-                delta_color=sharpe_color
-            )
-        with metric_cols[3]:
-            st.metric(
-                "Max Drawdown",
-                f"{results['max_drawdown_pct']:.1%}",
-                "Worst loss"
-            )
-        
-        with metric_cols[4]:
-            st.metric(
-                "Win Rate",
-                f"{results['win_rate']:.1%}",
-                f"{results['winning_trades']}/{results['num_trades']}"
-            )
-        
-        # Second row: Additional risk metrics
-        metric_cols2 = st.columns([1, 1, 3])
-        
-        with metric_cols2[0]:
-            st.metric(
-                "Annualized Volatility",
-                f"{results['annualized_volatility']:.1%}",
-                "Annual std dev"
-            )
-        
-        with metric_cols2[1]:
-            st.metric(
-                "Total Fees Paid",
-                f"${results['total_fees_paid']:,.0f}",
-                "Transaction costs"
-            )
-        
-        # Performance interpretation
-        st.caption(f"📌 Risk-Free Rate: {results['risk_free_rate']:.2%} (US 10Y Treasury average over backtest period)")
-        
-        if results['sharpe_ratio'] >= 1.0:
-            st.success("✅ **Strong Performance:** Sharpe ≥ 1.0 indicates excellent risk-adjusted returns")
-        elif results['sharpe_ratio'] >= 0.5:
-            st.info("ℹ️ **Moderate Performance:** Sharpe 0.5-1.0 indicates acceptable risk-adjusted returns")
-        else:
-            st.warning("⚠️ **Weak Performance:** Sharpe < 0.5 suggests high risk relative to returns")
-        
-        st.markdown("---")
-        
+
         # Equity curve
-        st.subheader("📈 Portfolio Growth")
-        
         equity_vals, equity_dates = engine.get_equity_curve()
-        
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=equity_dates,
-            y=equity_vals,
-            fill='tozeroy',
+        fig_eq = go.Figure()
+        fig_eq.add_trace(go.Scatter(
+            x=equity_dates, y=equity_vals,
+            fill='tozeroy', fillcolor='rgba(19,44,104,0.06)',
+            line=dict(color='#132c68', width=2.5),
             name='Portfolio Value',
-            line=dict(color='#132c68', width=3),
-            fillcolor='rgba(19, 44, 104, 0.15)',
-            hovertemplate='Date: %{x}<br>Value: $%{y:,.0f}<extra></extra>'
+            hovertemplate='%{x|%b %d, %Y}<br>$%{y:,.0f}<extra></extra>',
         ))
-        
-        # Add initial capital line
-        fig.add_hline(
-            y=initial_capital,
-            line_dash="dash",
-            line_color="#f4c430",
-            line_width=2.5,
-            annotation_text=f"Initial: ${initial_capital:,}",
-            annotation_font_color="#132c68"
+        fig_eq.add_hline(y=initial_capital, line_dash="dash", line_color="#f4c430",
+                         line_width=1.5, annotation_text="Initial Capital",
+                         annotation_position="bottom right",
+                         annotation_font_color="#999")
+        fig_eq.update_layout(
+            title=f"Equity Curve — {label}",
+            yaxis_title="Portfolio Value ($)", template="plotly_white", height=400,
+            margin=dict(l=60, r=40, t=50, b=40), hovermode="x unified",
+            yaxis_tickformat="$,.0f",
         )
-        
-        fig.update_layout(
-            title=f"Equity Curve - {strategy_choice} Strategy",
-            xaxis_title="Date",
-            yaxis_title="Portfolio Value ($)",
-            hovermode='x unified',
-            height=450
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        
-        st.markdown("---")
-        
-        # Fee sensitivity
-        st.subheader("💰 Fee Sensitivity Analysis")
-        
-        col_fee1, col_fee2 = st.columns([2, 1])
-        
-        with col_fee2:
-            st.info(
-                "**Why it matters:**\n\n"
-                "Real-world trading incurs fees. "
-                "A robust strategy maintains edge even with realistic transaction costs (10-20 bps)."
-            )
-        
-        with col_fee1:
-            fee_levels = [0, 5, 10, 15, 20, 30, 50]
-            sensitivity_df = engine.compare_fees_sensitivity(signal_col, strategy_choice, fee_levels)
-            
-            st.dataframe(sensitivity_df, use_container_width=True, hide_index=True)
-        
-        if results['sharpe_ratio'] > 0 and float(sensitivity_df[sensitivity_df['Fees (bps)'] == 20]['Sharpe'].values[0]) < 0:
-            st.warning(
-                "⚠️ **Fee Sensitivity Alert:** Sharpe turns negative above 20 bps. "
-                "Strategy edge is fragile - requires very low execution costs."
-            )
-    
-    # ========================================================================
-    # SUBTAB 3: TRADE ANALYSIS
-    # ========================================================================
-    
-    with subtab3:
-        st.header("📋 Trade-Level Analysis")
-        
-        trade_log = engine.get_trade_log()
-        
-        if len(trade_log) > 0:
-            # Trade statistics
-            col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
-            
-            with col_stat1:
-                st.metric("Total Trades", f"{len(trade_log):,}")
-            with col_stat2:
-                avg_duration = trade_log['days_held'].mean()
-                st.metric("Avg Duration", f"{avg_duration:.1f} days")
-            with col_stat3:
-                total_fees = trade_log['fee_cost'].sum()
-                st.metric("Total Fees Paid", f"${total_fees:,.0f}")
-            with col_stat4:
-                avg_trade_pnl = trade_log['net_pnl'].mean()
-                st.metric("Avg Trade P&L", f"${avg_trade_pnl:,.0f}")
-            
-            st.markdown("---")
-            
-            # P&L Distribution
-            st.subheader("📊 P&L Distribution")
-            
-            col_chart1, col_chart2 = st.columns(2)
-            
-            with col_chart1:
-                # Histogram of returns
-                fig_hist = go.Figure()
-                fig_hist.add_trace(go.Histogram(
-                    x=trade_log['return_pct'],
-                    nbinsx=30,
-                    marker_color='lightblue',
-                    name='Return %'
-                ))
-                fig_hist.update_layout(
-                    title="Trade Return Distribution",
-                    xaxis_title="Return %",
-                    yaxis_title="Frequency",
-                    height=300
-                )
-                st.plotly_chart(fig_hist, use_container_width=True)
-            
-            with col_chart2:
-                # Win/Loss breakdown
-                wins = (trade_log['net_pnl'] > 0).sum()
-                losses = (trade_log['net_pnl'] < 0).sum()
-                
-                fig_pie = go.Figure(data=[go.Pie(
-                    labels=['Winners', 'Losers'],
-                    values=[wins, losses],
-                    marker_colors=['#28a745', '#dc3545']
-                )])
-                fig_pie.update_layout(
-                    title="Win/Loss Split",
-                    height=300
-                )
-                st.plotly_chart(fig_pie, use_container_width=True)
-            
-            st.markdown("---")
-            
-            # Trade log table
-            st.subheader("📋 Complete Trade Log")
-            
-            # Add filters
-            col_filter1, col_filter2 = st.columns(2)
-            with col_filter1:
-                show_trades = st.selectbox(
-                    "Show trades:",
-                    ["All", "Last 20", "Last 50", "Winners Only", "Losers Only"],
-                    index=1
-                )
-            with col_filter2:
-                sort_by = st.selectbox(
-                    "Sort by:",
-                    ["Exit Date (Recent)", "P&L (High to Low)", "P&L (Low to High)", "Duration"],
-                    index=0
-                )
-            
-            # Filter trades
-            filtered_log = trade_log.copy()
-            if show_trades == "Last 20":
-                filtered_log = filtered_log.tail(20)
-            elif show_trades == "Last 50":
-                filtered_log = filtered_log.tail(50)
-            elif show_trades == "Winners Only":
-                filtered_log = filtered_log[filtered_log['net_pnl'] > 0]
-            elif show_trades == "Losers Only":
-                filtered_log = filtered_log[filtered_log['net_pnl'] < 0]
-            
-            # Sort trades
-            if sort_by == "Exit Date (Recent)":
-                filtered_log = filtered_log.sort_values('exit_date', ascending=False)
-            elif sort_by == "P&L (High to Low)":
-                filtered_log = filtered_log.sort_values('net_pnl', ascending=False)
-            elif sort_by == "P&L (Low to High)":
-                filtered_log = filtered_log.sort_values('net_pnl', ascending=True)
-            elif sort_by == "Duration":
-                filtered_log = filtered_log.sort_values('days_held', ascending=False)
-            
-            # Format for display
-            display_log = filtered_log.copy()
-            display_log['entry_date'] = pd.to_datetime(display_log['entry_date']).dt.strftime('%Y-%m-%d')
-            display_log['exit_date'] = pd.to_datetime(display_log['exit_date']).dt.strftime('%Y-%m-%d')
-            display_log['entry_price'] = display_log['entry_price'].apply(lambda x: f"${x:.0f}")
-            display_log['exit_price'] = display_log['exit_price'].apply(lambda x: f"${x:.0f}")
-            display_log['net_pnl'] = display_log['net_pnl'].apply(lambda x: f"${x:,.0f}")
-            display_log['fee_cost'] = display_log['fee_cost'].apply(lambda x: f"${x:.2f}")
-            display_log['return_pct'] = display_log['return_pct'].apply(lambda x: f"{x:+.2%}")
-            
-            st.dataframe(display_log, use_container_width=True, hide_index=True)
-            
-            st.caption(f"Showing {len(filtered_log)} of {len(trade_log)} total trades")
-        else:
-            st.info("No trades executed. Try adjusting signal parameters or reducing lag.")
-    
-    # ========================================================================
-    # SUBTAB 4: EXPORT RESULTS
-    # ========================================================================
-    
-    with subtab4:
-        st.header("💾 Export Complete Analysis")
-        
-        st.info(
-            "**📦 What's Included:**\n\n"
-            "Export complete backtest results for offline analysis, reporting, or archiving:\n\n"
-            "✅ **Summary Sheet** - All performance metrics and configuration\n\n"
-            "✅ **Trade Log** - Complete trade-by-trade breakdown with P&L\n\n"
-            "✅ **Equity Curve** - Daily portfolio values for charting\n\n"
-            "**Format Options:** Excel (single file, multiple sheets) or CSV (separate files)"
-        )
-        
-        col_export1, col_export2 = st.columns([3, 1])
-        
-        with col_export1:
-            export_filename = st.text_input(
-                "📝 Filename",
-                value=f"backtest_lag{signal_lag}_capital{initial_capital//1000}k_fees{fee_bps}bps_{datetime.now().strftime('%Y%m%d_%H%M')}",
-                help="Filename includes key parameters for easy identification"
-            )
-        
-        with col_export2:
-            export_format = st.selectbox(
-                "📄 Format",
-                options=["xlsx", "csv"],
-                format_func=lambda x: "Excel (.xlsx)" if x == "xlsx" else "CSV (.csv)",
-                help="Excel: single file | CSV: 3 separate files"
-            )
-        
-        col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 1])
-        with col_btn2:
-            if st.button("📥 Export Results", type="primary", use_container_width=True):
-                try:
-                    export_path = Path("export") / export_filename
-                    
-                    engine.export_results(
-                        filepath=str(export_path),
-                        signal_lag=signal_lag,
-                        file_format=export_format
-                    )
-                    
-                    if export_format == 'xlsx':
-                        st.success(f"✅ **Exported Successfully!**\n\n`export/{export_filename}.xlsx`")
-                    else:
-                        st.success(
-                            f"✅ **Exported Successfully!**\n\n"
-                            f"Files created:\n"
-                            f"- `{export_filename}_summary.csv`\n"
-                            f"- `{export_filename}_trades.csv`\n"
-                            f"- `{export_filename}_equity.csv`"
-                        )
-                    
-                    st.balloons()
-                    
-                except Exception as e:
-                    st.error(f"❌ Export failed: {e}")
-        
-        st.markdown("---")
-        
-        # Quick stats summary for export preview
-        st.subheader("📊 Export Preview")
-        
-        preview_col1, preview_col2, preview_col3 = st.columns(3)
-        
-        with preview_col1:
-            st.markdown("**Configuration**")
-            st.text(f"Capital: ${initial_capital:,}")
-            st.text(f"Fees: {fee_bps} bps")
-            st.text(f"Lag: {signal_lag} days")
-        
-        with preview_col2:
-            st.markdown("**Performance**")
-            st.text(f"Total: {results['total_return_pct']:.1%}")
-            st.text(f"Annual: {results['annualized_return_pct']:.1%}")
-            st.text(f"Sharpe: {results['sharpe_ratio']:.2f}")
-        
-        with preview_col3:
-            st.markdown("**Trading Activity**")
-            st.text(f"Trades: {results['num_trades']}")
-            st.text(f"Win Rate: {results['win_rate']:.1%}")
-            st.text(f"Fees Paid: ${results['total_fees_paid']:,.0f}")
+        st.plotly_chart(fig_eq, use_container_width=True)
 
+        # Trade log
+        trades_df = engine.get_trade_log()
+        if not trades_df.empty:
+            with st.expander(f"📋 Trade Log — {label} ({len(trades_df)} trades)", expanded=False):
+                styled_trades = trades_df.copy()
+                st.dataframe(styled_trades, use_container_width=True, height=400)
 
-# ============================================================================
-# TAB 3: OPTIMIZATION & ANALYSIS
-# ============================================================================
+    # ── Side-by-side comparison (when both selected) ──
+    if strategy_choice == "Compare Both":
+        st.markdown("<hr class='gold-divider'>", unsafe_allow_html=True)
+        st.subheader("📊 Side-by-Side Comparison")
 
-elif tab_choice == "📈 Optimization & Analysis":
-    st.markdown("""
-    <div style='background: linear-gradient(135deg, #132c68 0%, #1a3a7f 100%); padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;'>
-        <h1 style='color: white; margin: 0;'>📈 Strategic Optimization & Economic Intelligence</h1>
-        <p style='color: #f4c430; margin: 0.5rem 0 0 0; font-size: 1.1rem;'>Advanced Analytics for Parameter Tuning & Market Insights</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.info(
-        "**Objective:** Understand the economic relationship between vessel dispersion and freight rates, "
-        "and optimize signal parameters for best performance."
-    )
-    
-    # ========================================================================
-    # SECTION 1: KEY INSIGHTS (TOP)
-    # ========================================================================
-    
-    st.markdown("---")
-    st.header("🎯 Key Insights")
-    
-    corr_avg = data_summary['correlation_avg']
-    r_squared = corr_avg ** 2
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric(
-            "📊 Correlation",
-            f"{corr_avg:.3f}",
-            delta="Weak positive"
-        )
-    
-    with col2:
-        st.metric(
-            "📉 R² (Variance Explained)",
-            f"{r_squared:.1%}",
-            delta=f"{100-r_squared*100:.0f}% unexplained"
-        )
-    
-    with col3:
-        # Calculate Q1 vs Q4 premium
-        regime_prices_temp = signals_df.groupby('disp_quartile', observed=True)['price_5tc'].mean()
-        if 'Q1_Low' in regime_prices_temp.index and 'Q4_High' in regime_prices_temp.index:
-            premium_pct = (regime_prices_temp['Q4_High'] - regime_prices_temp['Q1_Low']) / regime_prices_temp['Q1_Low']
-            st.metric(
-                "💰 Q4 vs Q1 Premium",
-                f"{premium_pct:.1%}",
-                delta="Higher dispersion → Higher rates"
-            )
-    
-    with col4:
-        active_days = (signals_df['signal_momentum'] != 0).sum()
-        active_pct = active_days / len(signals_df)
-        st.metric(
-            "📅 Signal Activity",
-            f"{active_pct:.1%}",
-            delta=f"{active_days:,} trading days"
-        )
-    
-    st.success(
-        "**Bottom Line:** Dispersion has a real but modest relationship with freight rates (~27% correlation). "
-        "High dispersion consistently commands premium pricing (+30-50% vs low dispersion), making it a useful "
-        "**filter or confirmation signal** in a multi-factor trading framework."
-    )
-    
-    st.markdown("---")
-    
-    # ========================================================================
-    # SECTION 2: QUARTILE ANALYSIS (VISUAL)
-    # ========================================================================
-    
-    st.header("📊 Price by Dispersion Regime")
-    
-    regime_prices = signals_df.groupby('disp_quartile', observed=True)[
-        'price_5tc'
-    ].agg(['mean', 'count', 'std']).reset_index()
-    regime_prices['count'] = regime_prices['count'].astype(int)
-    
-    if len(regime_prices) == 4:
-        q1_price = regime_prices[
-            regime_prices['disp_quartile'] == 'Q1_Low'
-        ]['mean'].values[0]
-        q4_price = regime_prices[
-            regime_prices['disp_quartile'] == 'Q4_High'
-        ]['mean'].values[0]
-        premium_pct = (q4_price - q1_price) / q1_price
-        premium_dollars = q4_price - q1_price
-        
-        # Create two-column layout: Chart + Details
-        col_chart, col_details = st.columns([2, 1])
-        
-        with col_chart:
-            # Enhanced chart with error bars
-            fig = go.Figure()
-            fig.add_trace(go.Bar(
-                x=regime_prices['disp_quartile'],
-                y=regime_prices['mean'],
-                marker_color=['#dc3545', '#ff9800', '#90ee90', '#28a745'],
-                text=[f"${v:.0f}" for v in regime_prices['mean']],
-                textposition='outside',
-                error_y=dict(
-                    type='data',
-                    array=regime_prices['std'],
-                    visible=True,
-                    color='gray'
-                ),
-                hovertemplate='<b>%{x}</b><br>Mean: $%{y:.0f}<br>Std Dev: %{error_y.array:.0f}<extra></extra>'
-            ))
-            fig.update_layout(
-                title="Average 5TC Price by Dispersion Quartile",
-                xaxis_title="Dispersion Regime",
-                yaxis_title="Average 5TC Price ($/day)",
-                height=400,
-                showlegend=False
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col_details:
-            st.markdown("**📋 Regime Statistics:**")
-            for _, row in regime_prices.iterrows():
-                quartile = row['disp_quartile']
-                mean_price = row['mean']
-                count = row['count']
-                std = row['std']
-                
-                st.markdown(f"**{quartile}**")
-                st.metric("Avg Price", f"${mean_price:.0f}/day", delta=f"σ=${std:.0f}")
-                st.caption(f"{count:,} observations ({100*count/len(signals_df):.1f}%)")
-                st.markdown("---")
-        
-        st.success(
-            f"**Economic Interpretation:** Prices increase monotonically with dispersion. "
-            f"Q4 (high dispersion) commands a **{premium_pct:.1%} premium** (${premium_dollars:.0f}/day) "
-            f"over Q1 (low dispersion). This is a structural market feature reflecting better "
-            f"vessel positioning and stronger demand conditions."
-        )
-    
-    st.markdown("---")
-    
-    # ========================================================================
-    # SECTION 3: LAG OPTIMIZATION
-    # ========================================================================
-    
-    st.header("⏱️ Signal Lag Optimization")
-    
-    st.info(
-        f"**Question:** Does dispersion lead prices, or is the relationship contemporaneous?\n\n"
-        f"Testing lags 0-20 days to find optimal predictive horizon. "
-        f"**Current setting:** {signal_lag}-day lag | "
-        f"**Hypothesis:** Forward contracts may respond with 1-3 week delay due to negotiation time."
-    )
-    
-    # User control for test range
-    col_test1, col_test2 = st.columns([1, 3])
-    with col_test1:
-        max_test_lag = st.selectbox(
-            "Test up to:",
-            options=[5, 10, 14, 20],
-            index=3,
-            help="Balance between thoroughness and computation time"
-        )
-    
-    with st.spinner(f"Testing lags 0-{max_test_lag} days..."):
-        lag_results = []
-        
-        for test_lag in range(0, max_test_lag + 1):
-            sg_test = SignalGenerator(clean_data, signal_lag=test_lag)
-            signals_test = sg_test.get_signals_dataframe()
-            
-            engine_test = BacktestEngine(
-                signals_test,
-                initial_capital=initial_capital,
-                transaction_fee_bps=fee_bps
-            )
-            results_test = engine_test.backtest_strategy('signal_momentum', f'Momentum_Lag{test_lag}')
-            
-            lag_results.append({
-                'Lag': test_lag,
-                'Sharpe': results_test['sharpe_ratio'],
-                'Return': results_test['total_return_pct'],
-                'Max DD': results_test['max_drawdown_pct'],
-                'Win Rate': results_test['win_rate'],
-                'Trades': results_test['num_trades']
-            })
-    
-    lag_df = pd.DataFrame(lag_results)
-    
-    # Find optimal lag
-    best_lag_idx = lag_df['Sharpe'].idxmax()
-    best_lag = lag_df.loc[best_lag_idx, 'Lag']
-    best_sharpe = lag_df.loc[best_lag_idx, 'Sharpe']
-    worst_sharpe = lag_df['Sharpe'].min()
-    
-    # Display key findings at top
-    col_opt1, col_opt2, col_opt3, col_opt4 = st.columns(4)
-    with col_opt1:
-        st.metric("🎯 Optimal Lag", f"{int(best_lag)} days", delta=f"Sharpe: {best_sharpe:.3f}")
-    with col_opt2:
-        improvement = best_sharpe - lag_df.loc[0, 'Sharpe']
-        st.metric("📈 vs Immediate", f"{improvement:+.3f}", delta="Sharpe improvement")
-    with col_opt3:
-        sharpe_range = best_sharpe - worst_sharpe
-        st.metric("📊 Sharpe Range", f"{sharpe_range:.3f}", delta=f"{worst_sharpe:.3f} to {best_sharpe:.3f}")
-    with col_opt4:
-        optimal_return = lag_df.loc[best_lag_idx, 'Return']
-        st.metric("💰 Best Return", f"{optimal_return:.1%}", delta=f"at {int(best_lag)}-day lag")
-    
-    # Visualization: Sharpe by lag
-    col_chart, col_table = st.columns([2, 1])
-    
-    with col_chart:
-        fig_lag = go.Figure()
-        
-        # Line + markers with color gradient
-        fig_lag.add_trace(go.Scatter(
-            x=lag_df['Lag'],
-            y=lag_df['Sharpe'],
-            mode='lines+markers',
-            marker=dict(
-                size=10,
-                color=lag_df['Sharpe'],
-                colorscale='RdYlGn',
-                showscale=True,
-                colorbar=dict(title="Sharpe")
-            ),
-            line=dict(width=2, color='lightblue'),
-            hovertemplate='<b>Lag %{x} days</b><br>Sharpe: %{y:.3f}<br>Return: ' + 
-                          lag_df['Return'].apply(lambda x: f"{x:.2%}").tolist()[0] + '<extra></extra>'
+        comp_data = {
+            'Metric': [
+                'Total Return', 'Annualized Return', 'Sharpe Ratio',
+                'Max Drawdown', 'Win Rate', 'Num Trades', 'Profit Factor',
+                'Total Fees Paid', 'Ann. Volatility',
+            ],
+            '📉 Inverted Momentum': [
+                f"{res_mom['total_return_pct']:.1%}",
+                f"{res_mom['annualized_return_pct']:.1%}",
+                f"{res_mom['sharpe_ratio']:.2f}",
+                f"{res_mom['max_drawdown_pct']:.1%}",
+                f"{res_mom['win_rate']:.1%}",
+                f"{res_mom['num_trades']}",
+                f"{res_mom.get('profit_factor', 0):.2f}",
+                f"${res_mom.get('total_fees_paid', 0):,.0f}",
+                f"{res_mom.get('annualized_volatility', 0):.1%}",
+            ],
+            '🔄 Mean Reversion': [
+                f"{res_mr['total_return_pct']:.1%}",
+                f"{res_mr['annualized_return_pct']:.1%}",
+                f"{res_mr['sharpe_ratio']:.2f}",
+                f"{res_mr['max_drawdown_pct']:.1%}",
+                f"{res_mr['win_rate']:.1%}",
+                f"{res_mr['num_trades']}",
+                f"{res_mr.get('profit_factor', 0):.2f}",
+                f"${res_mr.get('total_fees_paid', 0):,.0f}",
+                f"{res_mr.get('annualized_volatility', 0):.1%}",
+            ],
+        }
+        st.dataframe(pd.DataFrame(comp_data), use_container_width=True, hide_index=True)
+
+        # Overlaid equity curves
+        fig_comp = go.Figure()
+        eq_mom, dt_mom = engine_mom.get_equity_curve()
+        eq_mr, dt_mr = engine_mr.get_equity_curve()
+        fig_comp.add_trace(go.Scatter(
+            x=dt_mom, y=eq_mom, name='Inverted Momentum',
+            line=dict(color='#e74c3c', width=2.5),
         ))
-        
-        # Highlight optimal
-        fig_lag.add_trace(go.Scatter(
-            x=[best_lag],
-            y=[best_sharpe],
-            mode='markers',
-            marker=dict(size=20, color='gold', symbol='star', line=dict(width=2, color='red')),
-            name='Optimal',
-            hovertemplate='<b>⭐ OPTIMAL</b><br>Lag: %{x} days<br>Sharpe: %{y:.3f}<extra></extra>'
+        fig_comp.add_trace(go.Scatter(
+            x=dt_mr, y=eq_mr, name='Mean Reversion',
+            line=dict(color='#2ecc71', width=2.5),
         ))
-        
-        fig_lag.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
-        fig_lag.update_layout(
-            title=f"Performance by Signal Lag (0-{max_test_lag} days)",
-            xaxis_title="Signal Lag (days)",
-            yaxis_title="Sharpe Ratio",
-            height=400,
-            hovermode='x unified',
-            showlegend=False
+        fig_comp.add_hline(y=initial_capital, line_dash="dash", line_color="#999", line_width=1)
+        fig_comp.update_layout(
+            title="Equity Curves — Head to Head",
+            yaxis_title="Portfolio Value ($)", template="plotly_white", height=450,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0.5, xanchor="center"),
+            margin=dict(l=60, r=40, t=50, b=40), hovermode="x unified",
+            yaxis_tickformat="$,.0f",
         )
-        st.plotly_chart(fig_lag, use_container_width=True)
-    
-    with col_table:
-        st.markdown("**📊 Top 5 Lags:**")
-        top_5 = lag_df.nlargest(5, 'Sharpe')[['Lag', 'Sharpe', 'Return']].copy()
-        top_5['Lag'] = top_5['Lag'].astype(int).astype(str) + ' days'
-        top_5['Sharpe'] = top_5['Sharpe'].apply(lambda x: f"{x:.3f}")
-        top_5['Return'] = top_5['Return'].apply(lambda x: f"{x:.1%}")
-        st.dataframe(top_5, use_container_width=True, hide_index=True)
-    
-    # Interpretation
-    if best_lag == 0:
-        st.success(
-            f"✅ **Finding: Contemporaneous Relationship**\n\n"
-            f"Optimal lag is **0 days** (Sharpe: {best_sharpe:.3f}). The signal works best with immediate entry, "
-            f"suggesting dispersion and prices move together rather than in a lead-lag relationship. "
-            f"This indicates dispersion is a **coincident indicator**, not a leading one."
-        )
-    elif best_lag <= 3:
-        st.success(
-            f"✅ **Finding: Short-Term Predictive Power**\n\n"
-            f"Optimal lag is **{int(best_lag)} days** (Sharpe: {best_sharpe:.3f}). "
-            f"Brief delay improves performance, suggesting dispersion momentum has {int(best_lag)}-day predictive power. "
-            f"This could reflect information diffusion or contract negotiation lags in spot/near-term markets."
-        )
+        st.plotly_chart(fig_comp, use_container_width=True)
+
+    # ── Fee sensitivity ──
+    st.markdown("<hr class='gold-divider'>", unsafe_allow_html=True)
+    st.subheader("Fee Sensitivity Analysis")
+    st.caption("How does performance degrade as transaction costs increase?")
+
+    fee_levels = [0, 2, 5, 10, 15, 20, 30, 50]
+
+    if strategy_choice != "Compare Both":
+        sig_col = 'signal_momentum' if strategy_choice == "Inverted Momentum" else 'signal_mean_reversion'
+        with st.spinner("Computing fee sensitivity..."):
+            eng_fee = BacktestEngine(signals_df, initial_capital, transaction_fees_bps)
+            fee_df = eng_fee.compare_fees_sensitivity(sig_col, strategy_choice, fee_levels)
+        st.dataframe(fee_df, use_container_width=True, hide_index=True)
     else:
-        st.success(
-            f"✅ **Finding: Forward Contract Dynamics**\n\n"
-            f"Optimal lag is **{int(best_lag)} days** (Sharpe: {best_sharpe:.3f}). "
-            f"Longer lag suggests dispersion changes predict forward prices with ~{int(best_lag)}-day horizon, "
-            f"consistent with vessel repositioning time and forward contract negotiation periods. "
-            f"This supports the hypothesis that fleet positioning precedes forward curve adjustments."
+        fc1, fc2 = st.columns(2)
+        with fc1:
+            st.markdown("**📉 Inverted Momentum**")
+            with st.spinner("..."):
+                eng1 = BacktestEngine(signals_df, initial_capital, transaction_fees_bps)
+                st.dataframe(eng1.compare_fees_sensitivity('signal_momentum', 'Momentum', fee_levels),
+                             use_container_width=True, hide_index=True)
+        with fc2:
+            st.markdown("**🔄 Mean Reversion**")
+            with st.spinner("..."):
+                eng2 = BacktestEngine(signals_df, initial_capital, transaction_fees_bps)
+                st.dataframe(eng2.compare_fees_sensitivity('signal_mean_reversion', 'Mean Rev', fee_levels),
+                             use_container_width=True, hide_index=True)
+
+    # ── Export ──
+    st.markdown("<hr class='gold-divider'>", unsafe_allow_html=True)
+    st.subheader("📤 Export Results")
+
+    exp_col1, exp_col2, exp_col3 = st.columns([2, 2, 3])
+    with exp_col1:
+        export_format = st.radio("Format", ["xlsx", "csv"], horizontal=True, key="export_fmt")
+    with exp_col2:
+        export_btn = st.button("⬇️ Export Backtest Results", use_container_width=True)
+
+    if export_btn:
+        export_dir = Path("export")
+        export_dir.mkdir(exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        for label, engine, _ in engines:
+            safe_label = label.lower().replace(" ", "_")
+            fp = str(export_dir / f"backtest_{safe_label}_lag{signal_lag}_{ts}")
+            engine.export_results(fp, signal_lag=signal_lag, file_format=export_format)
+        st.success("✅ Results exported to `export/` folder.")
+
+
+# ============================================================================
+# TAB 4: ECONOMIC ANALYSIS
+# ============================================================================
+
+with tab_economics:
+    st.header("Economic Analysis")
+
+    st.info(
+        "📈 **Regime Analysis:** Days are split into dispersion quartiles to examine "
+        "how 5TC prices and forward returns behave in each regime.\n\n"
+        "| Quartile | Dispersion | Fleet | Expected Price Impact |\n"
+        "|---|---|---|---|\n"
+        "| **Q1** | Low | Concentrated | **Bullish** — scarcity |\n"
+        "| **Q2** | Med-Low | Slightly concentrated | Mildly bullish |\n"
+        "| **Q3** | Med-High | Slightly spread | Mildly bearish |\n"
+        "| **Q4** | High | Well spread | **Bearish** — efficient supply |"
+    )
+
+    # Quartile analysis
+    if 'disp_quartile' in signals_df.columns and 'return_5d' in signals_df.columns:
+        regime_stats = (
+            signals_df.dropna(subset=['return_5d'])
+            .groupby('disp_quartile', observed=True)
+            .agg(
+                avg_price=('price_5tc', 'mean'),
+                avg_return_5d=('return_5d', 'mean'),
+                std_return_5d=('return_5d', 'std'),
+                count=('price_5tc', 'size'),
+            )
+            .reset_index()
         )
-    
-    with st.expander("📋 View Full Results Table"):
-        display_lag_df = lag_df.copy()
-        display_lag_df['Lag'] = display_lag_df['Lag'].astype(int)
+
         st.dataframe(
-            display_lag_df.style.format({
-                'Sharpe': '{:.3f}',
-                'Return': '{:.2%}',
-                'Max DD': '{:.2%}',
-                'Win Rate': '{:.2%}',
-                'Trades': '{:.0f}'
-            }).background_gradient(subset=['Sharpe'], cmap='RdYlGn', vmin=-0.5, vmax=1.0),
+            regime_stats.style.format({
+                'avg_price': '${:,.0f}',
+                'avg_return_5d': '{:.4f}',
+                'std_return_5d': '{:.4f}',
+                'count': '{:,}',
+            }),
             use_container_width=True,
-            hide_index=True
-        )
-    
-    st.markdown("---")
-    
-    # ========================================================================
-    # SECTION 4: RISK FACTORS
-    # ========================================================================
-    
-    st.header("⚠️ Key Risk Factors")
-    
-    col_risk1, col_risk2 = st.columns(2)
-    
-    with col_risk1:
-        st.markdown("**🔴 Critical Limitations:**")
-        st.warning(
-            "• **Weak Correlation (r=0.27):** Only 7% of price variance explained\n\n"
-            "• **Non-Stationary:** Relationship changes over time/regimes\n\n"
-            "• **In-Sample Bias:** Optimized on historical data\n\n"
-            "• **Fee Sensitivity:** Edge degrades quickly with transaction costs"
-        )
-    
-    with col_risk2:
-        st.markdown("**🟡 Usage Recommendations:**")
-        st.info(
-            "✅ **Use as confirmation signal** in multi-factor framework\n\n"
-            "✅ **Combine with fundamentals** (iron ore prices, PMI, rates)\n\n"
-            "✅ **Monitor regime changes** (correlation can flip)\n\n"
-            "✅ **Keep fees realistic** (10-20 bps for institutional trading)"
         )
 
+        fig_regime = px.bar(
+            regime_stats, x='disp_quartile', y='avg_return_5d',
+            color='disp_quartile',
+            title="Average 5-Day Forward Return by Dispersion Quartile",
+            labels={'avg_return_5d': 'Avg 5d Return', 'disp_quartile': 'Dispersion Quartile'},
+            color_discrete_sequence=['#2ecc71', '#5eb8e8', '#f4c430', '#e74c3c'],
+        )
+        fig_regime.update_layout(template="plotly_white", height=400, showlegend=False,
+                                 margin=dict(l=40, r=40, t=50, b=40))
+        st.plotly_chart(fig_regime, use_container_width=True)
 
+    # Distribution plots
+    st.subheader("Distributions")
+    dc1, dc2 = st.columns(2)
+    with dc1:
+        fig_d1 = px.histogram(clean_data, x='price_5tc', nbins=50,
+                              title="5TC Price Distribution",
+                              color_discrete_sequence=['#132c68'])
+        fig_d1.update_layout(template="plotly_white", height=340,
+                             xaxis_title="5TC Price ($/day)", yaxis_title="Frequency",
+                             margin=dict(l=40, r=20, t=50, b=40))
+        st.plotly_chart(fig_d1, use_container_width=True)
+    with dc2:
+        fig_d2 = px.histogram(clean_data, x='avg_dispersion', nbins=50,
+                              title="Avg Dispersion Distribution",
+                              color_discrete_sequence=['#f4c430'])
+        fig_d2.update_layout(template="plotly_white", height=340,
+                             xaxis_title="Avg Dispersion", yaxis_title="Frequency",
+                             margin=dict(l=40, r=20, t=50, b=40))
+        st.plotly_chart(fig_d2, use_container_width=True)
+
+    # Granger causality
+    st.subheader("Granger Causality Test")
+    st.info(
+        "🔍 Tests whether **past dispersion** values help predict **future 5TC prices** "
+        "(beyond what past prices alone predict). Significant p-values (< 0.05) suggest predictive power."
+    )
+    try:
+        from statsmodels.tsa.stattools import grangercausalitytests
+
+        gc_data = clean_data[['price_5tc', 'avg_dispersion']].dropna()
+        max_gc_lag = st.slider("Max Granger Lag", 1, 20, 10, key="gc_lag")
+
+        with st.spinner("Running Granger causality tests..."):
+            gc_results = grangercausalitytests(gc_data, maxlag=max_gc_lag, verbose=False)
+
+        gc_rows = []
+        for lag, result in gc_results.items():
+            f_test = result[0]['ssr_ftest']
+            gc_rows.append({
+                'Lag (days)': lag,
+                'F-statistic': f"{f_test[0]:.3f}",
+                'p-value': f"{f_test[1]:.4f}",
+                'Significant (5%)': "✅ Yes" if f_test[1] < 0.05 else "❌ No",
+            })
+        st.dataframe(pd.DataFrame(gc_rows), use_container_width=True, hide_index=True)
+
+        # Quick interpretation
+        sig_lags = [r['Lag (days)'] for r in gc_rows if "✅" in r['Significant (5%)']]
+        if sig_lags:
+            st.success(f"📊 Dispersion has significant predictive power at lag(s): **{sig_lags}** days.")
+        else:
+            st.warning("⚠️ No significant Granger causality found at any tested lag.")
+
+    except ImportError:
+        st.warning("Install `statsmodels` for Granger causality tests: `pip install statsmodels`")
+    except Exception as e:
+        st.error(f"Granger test error: {e}")
+
+
+# ============================================================================
+# TAB 5: LEAD-LAG ANALYSIS (CHANGE 3)
+# ============================================================================
+
+with tab_leadlag:
+    st.header("🔬 Lead-Lag Cross-Correlation Analysis")
+
+    st.info(
+        "**Purpose:** Determine whether dispersion **leads** or **lags** 5TC price movements.\n\n"
+        "| Lag | Meaning | Trading Implication |\n"
+        "|---|---|---|\n"
+        "| **Positive (+k)** | Dispersion at *t* → Price at *t+k* | Dispersion **predicts** prices ✅ |\n"
+        "| **Zero (0)** | Contemporaneous | No predictive edge |\n"
+        "| **Negative (−k)** | Price at *t* → Dispersion at *t+k* | Signal is **late** ⚠️ |\n\n"
+        "If the peak |correlation| is at a positive lag, dispersion is a **leading indicator**."
+    )
+
+    # User toggles
+    ll_col1, ll_col2, ll_col3 = st.columns([2, 2, 1])
+    with ll_col1:
+        series_x_choice = st.selectbox(
+            "Dispersion Series (X)",
+            options=['avg_dispersion', 'avg_disp_change_5d'],
+            index=0,
+            format_func=lambda x: "Avg Dispersion (level)" if x == 'avg_dispersion' else "5-Day Change (Δ)",
+            help="Choose raw dispersion level or 5-day change."
+        )
+    with ll_col2:
+        series_y_choice = st.selectbox(
+            "Price Series (Y)",
+            options=['price_5tc', 'return_5d'],
+            index=0,
+            format_func=lambda x: "5TC Price (level)" if x == 'price_5tc' else "5-Day Return (%)",
+            help="Choose raw price or 5-day return."
+        )
+    with ll_col3:
+        max_lag_input = st.number_input("Max Lag (days)", min_value=5, max_value=40, value=20,
+                                        step=5, key="ll_max_lag")
+
+    # Compute cross-correlation
+    try:
+        cc_df = sg.compute_lead_lag_crosscorr(
+            series_x=series_x_choice,
+            series_y=series_y_choice,
+            max_lag=max_lag_input,
+        )
+
+        # Find peak absolute correlation
+        peak_idx = cc_df['correlation'].abs().idxmax()
+        peak_lag = int(cc_df.loc[peak_idx, 'lag'])
+        peak_corr = cc_df.loc[peak_idx, 'correlation']
+
+        # Interpretation with colored callout
+        if peak_lag > 0:
+            st.success(
+                f"📈 **Peak |correlation| at lag +{peak_lag} days (r = {peak_corr:.3f}):** "
+                f"Dispersion **LEADS** price by ~{peak_lag} days. "
+                f"This supports using dispersion as a **predictive** indicator for trading."
+            )
+        elif peak_lag < 0:
+            st.warning(
+                f"📉 **Peak |correlation| at lag {peak_lag} days (r = {peak_corr:.3f}):** "
+                f"Dispersion **LAGS** price by ~{abs(peak_lag)} days. "
+                f"The momentum signal may be **reacting late** to price moves. "
+                f"Consider using a different lag parameter."
+            )
+        else:
+            st.info(
+                f"⚖️ **Peak |correlation| at lag 0 (r = {peak_corr:.3f}):** "
+                f"Relationship is **contemporaneous** — no lead/lag advantage. "
+                f"The signal has no predictive edge at this combination."
+            )
+
+        # Bar chart with improved styling
+        colors = []
+        for i, row in cc_df.iterrows():
+            if i == peak_idx:
+                colors.append('#f4c430')  # Gold for peak
+            elif row['correlation'] > 0:
+                colors.append('#132c68')  # Navy for positive
+            else:
+                colors.append('#5eb8e8')  # Teal for negative
+
+        fig_ll = go.Figure()
+        fig_ll.add_trace(go.Bar(
+            x=cc_df['lag'], y=cc_df['correlation'],
+            marker_color=colors,
+            name='Cross-Correlation',
+            hovertemplate='Lag: %{x} days<br>Correlation: %{y:.4f}<extra></extra>',
+        ))
+        fig_ll.add_vline(x=0, line_dash="dash", line_color="#e74c3c", line_width=2,
+                         annotation_text="Lag = 0", annotation_position="top right",
+                         annotation_font=dict(size=11, color="#e74c3c"))
+        fig_ll.add_vline(x=peak_lag, line_dash="dot", line_color="#f4c430", line_width=2.5,
+                         annotation_text=f"Peak: lag={peak_lag} (r={peak_corr:.3f})",
+                         annotation_position="top left",
+                         annotation_font=dict(size=11, color="#b8860b"))
+
+        x_label = "Avg Dispersion (level)" if series_x_choice == 'avg_dispersion' else "5-Day Δ Dispersion"
+        y_label = "5TC Price (level)" if series_y_choice == 'price_5tc' else "5-Day Return"
+
+        fig_ll.update_layout(
+            title=f"Lead-Lag Cross-Correlation: {x_label} → {y_label}",
+            xaxis_title="Lag (days) — positive = dispersion leads price",
+            yaxis_title="Pearson Correlation Coefficient",
+            template="plotly_white", height=480,
+            margin=dict(l=60, r=40, t=60, b=50),
+            xaxis=dict(dtick=5, gridcolor="#eee"),
+            yaxis=dict(gridcolor="#eee"),
+        )
+        st.plotly_chart(fig_ll, use_container_width=True)
+
+        # Raw data in compact expander
+        with st.expander("📋 Raw Cross-Correlation Data"):
+            display_cc = cc_df[['lag', 'correlation']].copy()
+            display_cc['abs_correlation'] = display_cc['correlation'].abs()
+            display_cc = display_cc.sort_values('abs_correlation', ascending=False)
+            st.dataframe(
+                display_cc.style.format({'correlation': '{:.4f}', 'abs_correlation': '{:.4f}'}),
+                use_container_width=True, hide_index=True, height=400,
+            )
+
+    except Exception as e:
+        st.error(f"Error computing cross-correlation: {e}")
 
 
 # ============================================================================
 # FOOTER
 # ============================================================================
 
-st.markdown("<hr style='border: 2px solid #132c68; margin: 2rem 0 1rem 0;'>", unsafe_allow_html=True)
-st.markdown("""
-<div style='text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px; border: 2px solid #132c68;'>
-    <p style='color: #132c68; font-weight: 700; font-size: 1.2rem; margin: 0;'>⚓ FREIGHT ANALYTICS PLATFORM</p>
-    <p style='color: #5eb8e8; margin: 0.5rem 0; font-size: 0.95rem;'>Capesize Dispersion Intelligence • Professional Trading Tools • 2016-2025</p>
-    <p style='color: #6c757d; margin: 0.5rem 0 0 0; font-size: 0.85rem; font-style: italic;'>
-    <p style='color: #f4c430; margin: 0.75rem 0 0 0; font-size: 0.9rem; font-weight: 600;'>
-    Data-Driven Market Intelligence
-    </p>
-</div>
-""", unsafe_allow_html=True)
+st.markdown("<hr class='gold-divider'>", unsafe_allow_html=True)
+st.markdown(
+    "<p class='footer-text'>"
+    "⚓ Freight Analytics Platform · Capesize Dispersion Intelligence<br>"
+    "</p>",
+    unsafe_allow_html=True
+)

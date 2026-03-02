@@ -6,8 +6,12 @@ Responsibilities:
 - Automatic rebalancing
 - Calculate P&L with realistic fees
 - Performance metrics (Sharpe, Drawdown, Win Rate)
-- Fee sensitivity analysis
-"""
+- Fee sensitivity analysis- Supports both signal types: signal_momentum, signal_mean_reversion
+
+Economic Context:
+- Signal values range from -1.0 (100% SHORT) to +1.0 (100% LONG)
+- Position sizing is proportional to signal strength (0.25, 0.50, 0.75, 1.00)
+- Fees applied on entry and exit (basis points per trade)"""
 
 import pandas as pd
 import numpy as np
@@ -113,12 +117,25 @@ class BacktestEngine:
         Run a complete backtest.
         
         Args:
-            signal_column: Signal column ('signal_momentum' or 'signal_regime')
-            strategy_name: Strategy name for display
+            signal_column: Signal column name. Supported signals:
+                          - 'signal_momentum': Inverted momentum (HIGH disp = SHORT, LOW disp = LONG)
+                          - 'signal_mean_reversion': Accordion effect (fade extremes from 120d mean)
+            strategy_name: Strategy name for display and export
             
         Returns:
             Dict with results (Sharpe, Return, Drawdown, etc.)
+            
+        Raises:
+            ValueError: If signal_column not found in data
         """
+        # Validate signal column exists
+        if signal_column not in self.data.columns:
+            available_signals = [col for col in self.data.columns if col.startswith('signal_')]
+            raise ValueError(
+                f"Signal column '{signal_column}' not found in data. "
+                f"Available signals: {available_signals}"
+            )
+        
         # Fetch risk-free rate for this backtest period
         self.risk_free_rate = self._fetch_risk_free_rate()
         
@@ -335,7 +352,17 @@ class BacktestEngine:
         strategy_name: str,
         fee_levels: List[float]
     ) -> pd.DataFrame:
-        """Analyze sensitivity to different fee levels."""
+        """
+        Analyze strategy performance across different transaction fee levels.
+        
+        Args:
+            signal_column: 'signal_momentum' or 'signal_mean_reversion'
+            strategy_name: Strategy display name
+            fee_levels: List of fee levels in basis points (e.g., [0, 5, 10, 20, 50])
+            
+        Returns:
+            DataFrame with performance metrics at each fee level
+        """
         # Save original state to restore after sensitivity analysis
         original_fee = self.fee_bps
         original_results = self.results.copy() if self.results else {}
