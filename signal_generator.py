@@ -4,7 +4,7 @@ SignalGenerator Class - Feature Engineering and Trading Signals
 Responsibilities:
 - Normalize data (z-scores)
 - Classify into regimes (quartiles)
-- Generate trading signals with correct economic logic
+- Generate trading signals with economic logic
 - Provide explanations for each signal
 
 Economic Context:
@@ -67,10 +67,10 @@ class SignalGenerator:
         lag_text = f" with {signal_lag}-day lag" if signal_lag > 0 else ""
         self.signal_explanations = {
             'momentum': {
-                'description': f'📉 Inverted Dispersion Momentum{lag_text} (Correct Economic Logic)',
+                'description': f'📉 Inverted Dispersion Momentum{lag_text}',
                 'logic': f'HIGH dispersion (rising) → SHORT (bearish). LOW dispersion (falling) → LONG (bullish). Graduated sizing: 25%-100%{lag_text}',
                 'economic_meaning': (
-                    '✅ CORRECTED LOGIC: High dispersion = fleet well-positioned globally = efficient supply = BEARISH prices. '
+                    'LOGIC: High dispersion = fleet well-positioned globally = efficient supply = BEARISH prices. '
                     'Low dispersion = fleet concentrated = regional scarcity = BULLISH prices. '
                     'Rising dispersion → fleet spreading → supply efficiency increasing → prices fall → SHORT. '
                     'Falling dispersion → fleet concentrating → supply tightening → prices rise → LONG. '
@@ -288,7 +288,7 @@ class SignalGenerator:
         """
         Generate the INVERTED momentum signal (CHANGE 1).
         
-        ✅ CORRECTED ECONOMIC LOGIC:
+        ECONOMIC LOGIC:
         - Rising dispersion  (positive avg_disp_change_5d) → SHORT (bearish)
         - Falling dispersion (negative avg_disp_change_5d) → LONG  (bullish)
         """
@@ -563,7 +563,7 @@ class SignalGenerator:
             f"    (5d Δ: {latest['avg_disp_change_5d']:+.1f}, mom z: {latest['momentum_zscore']:.2f}σ)\n"
             f"  • Mean Reversion:     {_txt(mr)}\n"
             f"    (vs 120d mean, mr z: {mr_z:.2f}σ)\n\n"
-            f"✅ CORRECTED LOGIC: High/rising disp = SHORT · Low/falling disp = LONG\n"
+            f"LOGIC: High/rising disp = SHORT · Low/falling disp = LONG\n"
         )
     
     @staticmethod
