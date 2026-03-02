@@ -141,6 +141,45 @@ st.markdown("""
     .signal-flat { display: inline-block; background: #e2e3e5; color: #383d41; padding: 0.25rem 0.75rem;
                    border-radius: 20px; font-weight: 600; font-size: 0.85rem; }
 
+    /* Strategy selector — card-style radio in sidebar */
+    [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] {
+        gap: 0.35rem;
+        display: flex;
+        flex-direction: column;
+    }
+    [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label {
+        background: rgba(255,255,255,0.06);
+        border: 1.5px solid rgba(255,255,255,0.12);
+        border-radius: 10px;
+        padding: 0.6rem 0.85rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        margin: 0 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label:hover {
+        background: rgba(244,196,48,0.12);
+        border-color: rgba(244,196,48,0.5);
+    }
+    [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) {
+        background: rgba(244,196,48,0.18);
+        border: 2px solid #f4c430;
+        box-shadow: 0 0 0 3px rgba(244,196,48,0.12);
+    }
+    [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label p {
+        color: rgba(255,255,255,0.88) !important;
+        font-weight: 500 !important;
+        font-size: 0.88rem !important;
+        margin: 0 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) p {
+        color: #f4c430 !important;
+        font-weight: 700 !important;
+    }
+    /* Hide the radio circle dot — the card border IS the selector */
+    [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child {
+        display: none !important;
+    }
+
     /* Divider */
     .gold-divider { margin: 1.5rem 0; border: none; border-top: 3px solid #f4c430; }
 
@@ -201,24 +240,71 @@ def get_signal_generator(clean_data, signal_lag, mr_threshold):
 
 logo_file = find_logo("assets")
 
-header_col1, header_col2 = st.columns([1, 5])
-with header_col1:
-    if logo_file:
-        st.image(logo_file, width=110)
-    else:
-        st.markdown("<div style='font-size:4rem; text-align:center;'>⚓</div>", unsafe_allow_html=True)
+# ── Hero banner ──
+st.markdown("""
+<div style='
+    background: linear-gradient(135deg, #0d1f4a 0%, #132c68 55%, #1a3a7f 100%);
+    border-radius: 16px;
+    padding: 2.2rem 2.4rem;
+    margin-bottom: 1.2rem;
+    box-shadow: 0 4px 24px rgba(19,44,104,0.18);
+    border-bottom: 4px solid #f4c430;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+'>
+""", unsafe_allow_html=True)
 
-with header_col2:
+banner_col_logo, banner_col_divider, banner_col_text = st.columns([2, 0.04, 5])
+
+with banner_col_logo:
+    if logo_file:
+        st.image(logo_file, use_container_width=True)
+    else:
+        st.markdown(
+            "<div style='font-size:7rem; text-align:center; line-height:1;'>⚓</div>",
+            unsafe_allow_html=True,
+        )
+
+with banner_col_divider:
+    st.markdown(
+        "<div style='width:2px; background:rgba(244,196,48,0.45); height:120px; margin:auto;'></div>",
+        unsafe_allow_html=True,
+    )
+
+with banner_col_text:
     st.markdown("""
-    <div style='padding: 0.5rem 0;'>
-        <h1 style='margin-bottom:0.1rem; font-size:2.5rem;'>Freight Analytics Platform</h1>
-        <p style='color:#5eb8e8; font-size:1.1rem; margin:0; font-weight:500;'>
-            Capesize Dispersion Intelligence · 5TC Price Prediction Engine
-        </p>
+    <div style='padding: 0.6rem 0 0.6rem 0.5rem;'>
+        <h1 style='
+            color: white;
+            margin: 0 0 0.35rem 0;
+            font-size: 2.6rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.25);
+        '>Freight Analytics Platform</h1>
+        <p style='
+            color: #5eb8e8;
+            font-size: 1.1rem;
+            margin: 0 0 0.6rem 0;
+            font-weight: 500;
+            letter-spacing: 0.2px;
+        '>Capesize Dispersion Intelligence &nbsp;·&nbsp; 5TC FFA Price Prediction Engine</p>
+        <div style='display:flex; gap:0.7rem; flex-wrap:wrap; margin-top:0.3rem;'>
+            <span style='background:rgba(244,196,48,0.18); border:1px solid rgba(244,196,48,0.45);
+                         color:#f4c430; border-radius:20px; padding:0.2rem 0.75rem;
+                         font-size:0.78rem; font-weight:600;'>⚓ Capesize 5TC</span>
+            <span style='background:rgba(94,184,232,0.15); border:1px solid rgba(94,184,232,0.4);
+                         color:#5eb8e8; border-radius:20px; padding:0.2rem 0.75rem;
+                         font-size:0.78rem; font-weight:600;'>📊 Dual-Signal Engine</span>
+            <span style='background:rgba(94,184,232,0.15); border:1px solid rgba(94,184,232,0.4);
+                         color:#5eb8e8; border-radius:20px; padding:0.2rem 0.75rem;
+                         font-size:0.78rem; font-weight:600;'>🔬 Lead-Lag Diagnostic</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown("<hr class='gold-divider'>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ============================================================================
@@ -226,10 +312,6 @@ st.markdown("<hr class='gold-divider'>", unsafe_allow_html=True)
 # ============================================================================
 
 with st.sidebar:
-    # Sidebar logo
-    if logo_file:
-        st.image(logo_file, width=70)
-
     st.markdown("""
     <div style='text-align:center; padding:0.8rem 0 1rem 0; border-bottom:2px solid rgba(244,196,48,0.4);
                 margin-bottom:1rem;'>
@@ -253,12 +335,29 @@ with st.sidebar:
         help="Minimum |z-score| vs 120d mean to trigger mean-reversion signal."
     )
 
-    strategy_choice = st.radio(
-        "Strategy to Backtest",
-        options=["Inverted Momentum", "Mean Reversion", "Compare Both"],
-        index=0,
-        help="Select which signal to evaluate in the Backtest tab."
+    st.markdown(
+        "<p style='color:rgba(255,255,255,0.65); font-size:0.75rem; margin:0 0 0.4rem 0; "
+        "text-transform:uppercase; letter-spacing:0.6px; font-weight:600;'>🎯 Strategy to Backtest</p>",
+        unsafe_allow_html=True,
     )
+    _STRATEGY_OPTIONS = [
+        "📉  Inverted Momentum",
+        "🔄  Mean Reversion",
+        "⚖️  Compare Both",
+    ]
+    _STRATEGY_MAP = {
+        "📉  Inverted Momentum": "Inverted Momentum",
+        "🔄  Mean Reversion":    "Mean Reversion",
+        "⚖️  Compare Both":      "Compare Both",
+    }
+    _strategy_display = st.radio(
+        "Strategy to Backtest",
+        options=_STRATEGY_OPTIONS,
+        index=0,
+        label_visibility="collapsed",
+        help="Select which signal to evaluate in the Backtest tab.",
+    )
+    strategy_choice = _STRATEGY_MAP[_strategy_display]
 
     st.markdown("---")
     st.markdown("#### 💰 Backtest Settings")
